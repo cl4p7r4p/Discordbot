@@ -4,4 +4,5 @@
 You need a "config.py" File with your EQDKP API Mastertoken and your Bottoken like this:
 
 mastertoken = ashd1231291aeeeff
-guffeltoke2 = NASDJJsdas8128
+
+guffeltoken2 = NASDJJsdas8128
