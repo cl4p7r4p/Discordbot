@@ -193,7 +193,7 @@ und den `setup`-Befehl erneut ausführen.
             await channel.send("Dein Token wird aktualisiert.")
         else:
             await channel.send("Dein Token wird hinzugefügt.")
-        self.registered_users[author.id] = args[0]
+        self.registered_users[author.id] = {'token':args[0]}
         try:
             with open('users.pkl', 'wb') as f:
                 pickle.dump(self.registered_users, f)
@@ -241,7 +241,7 @@ und den `setup`-Befehl erneut ausführen.
                     char_options = []
                     char_ids = []
                     note = "powered by guffelbot"
-                    chars = await getData(self.registered_users[user.id],"chars")
+                    chars = await getData(self.registered_users[user.id]['token'],"chars")
                     for char in chars['chars']:
                         print(char)
                         char_options.append(chars['chars'][char]['name'])
@@ -268,7 +268,7 @@ und den `setup`-Befehl erneut ausführen.
             await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
             return
         await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
-        r =  await raidevent.signup(self.registered_users[user.id], char_ids[charidx], reactStatus[reaction.emoji],note)
+        r =  await raidevent.signup(self.registered_users[user.id]['token'], char_ids[charidx], reactStatus[reaction.emoji],note)
         print("response: {}".format(r))
         print("type: {}".format(type(r)))
         try:

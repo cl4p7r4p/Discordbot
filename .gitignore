@@ -5,3 +5,4 @@ config.py
 .venv
 *.pkl
 test.py
+test.py
