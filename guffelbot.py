@@ -191,15 +191,40 @@ und den `setup`-Befehl erneut ausführen.
             return
         if author.id in self.registered_users:
             await channel.send("Dein Token wird aktualisiert.")
+            self.registered_users[author.id]['token'] = args[0]
         else:
             await channel.send("Dein Token wird hinzugefügt.")
-        self.registered_users[author.id] = args[0]
+            self.registered_users[author.id] = {'token':args[0]}
+        await self.dumpPickle()
+        return
+
+    async def dumpPickle(self):
         try:
             with open('users.pkl', 'wb') as f:
                 pickle.dump(self.registered_users, f)
         except Exception as e:
             print(e)
-            await channel.send("Permanente Nutzerregistrierung fehlgeschlagen, bitte informiere Theo.")
+            await channel.send("Beim der permanenten Speicherung von Daten ist ein Fehler aufgetreten")
+        return
+
+    async def register_OneClick(self, msg, user, char_id, char_name):
+        answer = await self.selection_helper("Möchtest du in Zukunft die 1-Klick-Anmeldung nutzen?", ["Ja", "Nein"], user, msg.channel)
+        if answer==1:
+            try:
+                self.registered_users[user.id]['oneclick'] = 1
+                self.registered_users[user.id]['char_name'] = char_name
+                self.registered_users[user.id]['char_id'] = char_id
+                await self.dumpPickle()
+            except Exception as e:
+                print(e)
+                await msg.channel.send("Da ging was schief.")
+                return
+            success_embed = discord.Embed(
+                title="1-Klick-Anmeldung startklar",
+                description="Das war ein voller Erfolg. In Zukunft wirst du direkt beim Klick auf die Reaktion mit **{}** entsprechend angemeldet.".format(char_name)
+            )
+            await msg.channel.send(embed=success_embed)
+        return
 
     async def selection_helper(self, prompt, list, author, channel):
         def check(message):
@@ -228,47 +253,52 @@ und den `setup`-Befehl erneut ausführen.
             print('Fehler in der Notizabfrage: Notiz zu kurz')
 
     async def signupByReaction(self, reaction, user, raidevent):
-        print(user.id)
-
         self.authorized(user)
         status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
+        note = "powered by guffelbot"
 
-        msg = await user.send("Hey {}.".format(user.name))
-        try:
-            answer = await self.selection_helper("Du willst Dich für den Raid __**{}**__ **{}**?".format(raidevent.title,reactDict[reaction.emoji]), ["Ja", "Nein"], user, msg.channel)
-            if answer == 1:
-                try:
-                    char_options = []
-                    char_ids = []
-                    note = "powered by guffelbot"
-                    chars = await getData(self.registered_users[user.id],"chars")
-                    for char in chars['chars']:
-                        print(char)
-                        char_options.append(chars['chars'][char]['name'])
-                        char_ids.append(chars['chars'][char]['id'])
-                    if len(char_options) > 1:
-                        charidx = await self.selection_helper("Welcher Charakter?", char_options, user, msg.channel)-1
-                    else:
-                        charidx = 0
-                    notiz = await self.selection_helper("Möchtest du deiner Anmeldung eine Notiz hinzufügen?", ["Ja", "Nein"], user, msg.channel)
-                    print("antwort auf notizfrage: {}".format(notiz))
-                    if notiz == 1:
-                        note = await self.note_helper(user, msg.channel)
-                        print("eingegebene notiz: {}".format(note))
-
-                except Exception as e:
-                    print(e)
-                    await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
+        ## wenn für oneclick angemeldet den ganzen kram überspringen.
+        if 'oneclick' in self.registered_users[user.id]:
+            if self.registered_users[user.id]['oneclick']==1:
+                msg = await user.send("1-Klick-Anmeldung läuft")
+                char_id = self.registered_users[user.id]['char_id']
+                pass
+        else:
+            msg = await user.send("Hey {}.".format(user.name))
+            try:
+                answer = await self.selection_helper("Du willst Dich für den Raid __**{}**__ **{}**?".format(raidevent.title,reactDict[reaction.emoji]), ["Ja", "Nein"], user, msg.channel)
+                if answer == 1:
+                    try:
+                        char_options = []
+                        char_ids = []
+                        chars = await getData(self.registered_users[user.id]['token'],"chars")
+                        for char in chars['chars']:
+                            print(char)
+                            char_options.append(chars['chars'][char]['name'])
+                            char_ids.append(chars['chars'][char]['id'])
+                        if len(char_options) > 1:
+                            charidx = await self.selection_helper("Welcher Charakter?", char_options, user, msg.channel)-1
+                        else:
+                            charidx = 0
+                        notiz = await self.selection_helper("Möchtest du deiner Anmeldung eine Notiz hinzufügen?", ["Ja", "Nein"], user, msg.channel)
+                        print("antwort auf notizfrage: {}".format(notiz))
+                        if notiz == 1:
+                            note = await self.note_helper(user, msg.channel)
+                            print("eingegebene notiz: {}".format(note))
+                        char_id = char_ids[charidx]
+                    except Exception as e:
+                        print(e)
+                        await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
+                        return
+                else:
+                    await msg.channel.send("Abgebrochen")
                     return
-            else:
-                await msg.channel.send("Abgebrochen")
+            except Exception as e:
+                print(e)
+                await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
                 return
-        except Exception as e:
-            print(e)
-            await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
-            return
-        await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
-        r =  await raidevent.signup(self.registered_users[user.id], char_ids[charidx], reactStatus[reaction.emoji],note)
+            await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
+        r =  await raidevent.signup(self.registered_users[user.id]['token'], char_id, reactStatus[reaction.emoji],note)
         print("response: {}".format(r))
         print("type: {}".format(type(r)))
         try:
@@ -279,6 +309,9 @@ und den `setup`-Befehl erneut ausführen.
                 )
                 success_embed.set_thumbnail(url=raidevent.iconURL)
                 await msg.channel.send(embed=success_embed)
+                ## Ein Klick registrierung anbieten
+                if not 'oneclick' in self.registered_users[user.id]:
+                    await self.register_OneClick(msg,user,char_ids[charidx],char_options[charidx])
             else:
                 if r['error'] == 'required data missing' and r['info'] == 'roleid':
                     await msg.channel.send(embed=discord.Embed(

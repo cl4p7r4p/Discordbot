@@ -4,3 +4,4 @@ config.py
 .vscode
 .venv
 *.pkl
+test.py
