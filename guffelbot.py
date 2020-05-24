@@ -85,6 +85,9 @@ class Guffelbot(discord.Client):
             await self.deletemsg(message)
             await self.postRaids(message)
 
+        if message.content == 'change oneclick':
+            await self.oneclickSwitch(message)
+
     async def postRaids(self,message):
         for ev in raidEvents:
             if ev.isPosted and (int(time.time())-ev.creationTime)<120:
@@ -226,6 +229,35 @@ und den `setup`-Befehl erneut ausführen.
             await msg.channel.send(embed=success_embed)
         return
 
+    async def oneclickSwitch(self, msg):
+        if not 'oneclick' in self.registered_users[msg.author.id]:
+            await msg.channel.send("Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\nBitte durchlaufe einmal den regulären Anmeldeprozess mit mir, indem du auf eine Reaktion unter dem Raidevent klickst.")
+            return
+        else:
+            oneclick_status = self.registered_users[msg.author.id]['oneclick']
+            answer = await self.selection_helper("Möchtest du in die 1-Klick-Anmeldung ein- oder ausschalten?", ["einschalten", "ausschalten"], msg.author, msg.channel)
+            if answer==1 and oneclick_status==0:
+                try:
+                    self.registered_users[msg.author.id]['oneclick'] = 1
+                    await self.dumpPickle()
+                    await msg.channel.send("Die 1-Klick-Anmeldung ist jetzt eingeschaltet")
+                    return
+                except Exception as e:
+                    print(e)
+                    await msg.channel.send("Da ging was schief.")
+                    return
+            elif answer==2 and oneclick_status==1:
+                try:
+                    self.registered_users[msg.author.id]['oneclick'] = 0
+                    await self.dumpPickle()
+                    await msg.channel.send("Die 1-Klick-Anmeldung ist jetzt ausgeschaltet")
+                    return
+                except Exception as e:
+                    print(e)
+                    await msg.channel.send("Da ging was schief.")
+                    return
+            return
+
     async def selection_helper(self, prompt, list, author, channel):
         def check(message):
             return message.author == author and message.channel == channel
@@ -256,16 +288,19 @@ und den `setup`-Befehl erneut ausführen.
         self.authorized(user)
         status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
         note = "powered by guffelbot"
+        oneclick_status = -1
 
         ## wenn für oneclick angemeldet den ganzen kram überspringen.
         if 'oneclick' in self.registered_users[user.id]:
-            if self.registered_users[user.id]['oneclick']==1:
+            oneclick_status = self.registered_users[user.id]['oneclick']
+            if oneclick_status==1:
                 msg = await user.send("1-Klick-Anmeldung läuft")
                 char_id = self.registered_users[user.id]['char_id']
-                pass
-        else:
+        elif 'oneclick' not in self.registered_users[user.id] or oneclick_status==0:
             msg = await user.send("Hey {}.".format(user.name))
             try:
+                print('start regular signup process')
+                # msg = await user.send("Hey {}.".format(user.name))
                 answer = await self.selection_helper("Du willst Dich für den Raid __**{}**__ **{}**?".format(raidevent.title,reactDict[reaction.emoji]), ["Ja", "Nein"], user, msg.channel)
                 if answer == 1:
                     try:
