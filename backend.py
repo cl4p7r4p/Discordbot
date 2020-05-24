@@ -183,7 +183,7 @@ class RaidEvent():
             "memberid": memberid,
             "status": status,
         }
-        if note != "guffelbot":
+        if len(note) > 1:
             payload['note'] = note
         payload = json.dumps(payload)
         print("trying to post signup")
