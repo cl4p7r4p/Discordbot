@@ -86,7 +86,7 @@ class Guffelbot(discord.Client):
             await self.postRaids(message)
 
         if message.content == 'change oneclick':
-            await self.oneclickSwitch(message)
+            await self.oneclick(message.author, message.channel, args=None)
 
     async def postRaids(self,message):
         for ev in raidEvents:
@@ -151,8 +151,8 @@ Verfügbare Befehle:
 [Kommende Raids]
 - !cddt next
 
-[Raidstatus]
-- !cddt status
+[1-Klick-Anmeldung]
+- !cddt oneclick
 
 Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
 ```
@@ -163,24 +163,24 @@ Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
                 await channel.send(doc)
             except Exception as e:
                 print(e)
-                await channel.send("Dafür fehlt mir leider der Hilfetext, informiere Theo")
+                await channel.send("Dafür fehlt mir leider der Hilfetext")
 
     async def setup(self, author, channel, args):
         """__**Einrichtung des EQDKP Tokens**__
-    Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite \
+Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite \
 https://cddt-wow.de registriert und freigeschaltet sein.
 
-    Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen \
+Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen \
 Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. Alternativ nutze diesen Link \
     https://cddt-wow.de/index.php/Settings.html?s=.
 
-    Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel` \
+Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel` \
 als `Privater API-Schlüssel`. Du kannst rechts auf `**********` klicken um es dir \
 anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszuführen.
 
 `!cddt setup 12345ab34dc...34255612313`
 
-    Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot. Sonst hat jeder dein Token \
+Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot. Sonst hat jeder dein Token \
 und kann sich unter deinem Namen für Raids anmelden. Sollte dein Token einmal in fremde Hände \
 gelangen, kannst du auf der Webseite, dort wo du auch dein Token gefunden hast, neue Schlüssel generieren \
 und den `setup`-Befehl erneut ausführen.
@@ -229,29 +229,34 @@ und den `setup`-Befehl erneut ausführen.
             await msg.channel.send(embed=success_embed)
         return
 
-    async def oneclickSwitch(self, msg):
-        if not 'oneclick' in self.registered_users[msg.author.id]:
-            await msg.channel.send("Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\nBitte durchlaufe einmal den regulären Anmeldeprozess mit mir, indem du auf eine Reaktion unter dem Raidevent klickst.")
+    async def oneclick(self, author, channel, args):
+        """__**Die 1-Klick-Anmeldung**__
+Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, dass Du die reguläre Anmeldeprozedur einmal durchlaufen hast. \
+Am Ende der Anmeldung wirst du gefragt, ob du die 1-Klick-Anmeldung freischalten möchtest.\
+Zum ein- und ausschalten der Anmeldung tippe: `change oneclick` oder `!cddt oneclick`
+        """
+        if not 'oneclick' in self.registered_users[author.id]:
+            await channel.send("Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\nBitte durchlaufe einmal den regulären Anmeldeprozess mit mir, indem du auf eine Reaktion unter dem Raidevent klickst.")
             return
         else:
-            oneclick_status = self.registered_users[msg.author.id]['oneclick']
+            oneclick_status = self.registered_users[author.id]['oneclick']
             text = {0:"ausgeschaltet",1:"eingeschaltet"}
-            answer = await self.selection_helper("Die 1-Klick-Anmeldung ist aktuell **{}**. Möchtest du das ändern?".format(text[oneclick_status]), ["Ja", "Nein"], msg.author, msg.channel)
+            answer = await self.selection_helper("Die 1-Klick-Anmeldung ist aktuell **{}**. Möchtest du das ändern?".format(text[oneclick_status]), ["Ja", "Nein"], author, channel)
             if answer==1 and oneclick_status==0:
                 new_status = 1
             elif answer==1 and oneclick_status==1:
                 new_status = 0
             else:
-                await msg.channel.send("Die 1-Klick-Anmeldung bleibt **{}**".format(text[oneclick_status]))
+                await channel.send("Die 1-Klick-Anmeldung bleibt **{}**".format(text[oneclick_status]))
                 return
             try:
-                self.registered_users[msg.author.id]['oneclick'] = new_status
+                self.registered_users[author.id]['oneclick'] = new_status
                 await self.dumpPickle()
-                await msg.channel.send("Die 1-Klick-Anmeldung wurde **{}**".format(text[new_status]))
+                await channel.send("Die 1-Klick-Anmeldung wurde **{}**".format(text[new_status]))
                 return
             except Exception as e:
                 print(e)
-                await msg.channel.send("Da ging was schief.")
+                await channel.send("Da ging was schief.")
                 return
 
     async def selection_helper(self, prompt, list, author, channel):
