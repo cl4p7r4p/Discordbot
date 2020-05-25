@@ -21,14 +21,14 @@ reactStatus = {
 status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
 
 eventDic = {}
-raids_posted = 0
+
 
 class Unauthorized(Exception):
     pass
 
 class Guffelbot(discord.Client):
 
-
+    raids_posted = 0
     def authorized(self, author):
         if not author.id in self.registered_users:
             raise Unauthorized()
@@ -41,6 +41,7 @@ class Guffelbot(discord.Client):
                 self.registered_users = pickle.load(f)
         except:
             self.registered_users = {}
+
 
     async def on_ready(self):
         print('Logged on as', self.user)
@@ -106,8 +107,8 @@ class Guffelbot(discord.Client):
                 await ev.update()
                 await msg.edit(embed=ev.embed.embedContent)
 
-            elif limit != raids_posted:
-                raids_posted += 1
+            elif limit != self.raids_posted:
+                self.raids_posted += 1
                 msg = await message.channel.send(embed=ev.embed.embedContent)
                 ev.isPosted = True
                 ev.messageID = msg.id
