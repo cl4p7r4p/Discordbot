@@ -203,7 +203,6 @@ async def postData(token,fun,payload):
         async with  aiohttp.ClientSession() as session:
             async with session.post(base_url+'/api.php?format=json&atoken='+token+'&function='+functions[fun], data=payload) as resp:
                 status = await resp.text()
-                print(status)
         await session.close()
         return json.loads(status)
     except:
@@ -243,13 +242,6 @@ def getEventById(id):
         if event.ID == int(id):
             return event
     return -1
-
-
-# "{0} von {1} Uhr bis {2} Uhr: {3}".format(
-#     '.'.join(reversed(event.get('start').split(' ')[0].split('-'))),
-#     event.get('start').split(' ')[1],
-#     event.get('end').split(' ')[1],
-#     event.get('title')
 
 def timeToStr(zeit):
     try:
