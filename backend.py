@@ -23,6 +23,7 @@ base_url = protocol + "://" + server
 
 functions = {
     "list" : "calevents_list&number=3&raids_only=1", ## **number** = anzahl der nächsten Raids
+    "nextevents" : "calevents_list&number=10&raids_only=1", ## **number** = anzahl der nächsten Raids
     "details": "calevents_details&eventid=",
     "signup" : "raid_signup&atype=user",
     "comment" : "add_comment&atype=api",

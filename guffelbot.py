@@ -18,6 +18,9 @@ reactStatus = {
     "🚫": 2, #status 2
     "💤": 3 #status 3
 }
+status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
+
+
 class Unauthorized(Exception):
     pass
 
@@ -125,18 +128,26 @@ class Guffelbot(discord.Client):
             except:
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
 
+# for event in data['events']:
+#     if data['events'][event]['closed'] == 0:
+#         nextEvents.append(data['events'][event]['eventid'])
+#     else:
+#         pass
+
 
     async def next(self, author, channel, args):
         event_embed = discord.Embed(title="Kommende Raids")
-        for raid in raidEvents:
+        nextEvents = await getData(self.registered_users[author.id]['token'], nextevents)
+        for raid in nextEvents['events']:
             event_embed.add_field(
-                name=raid.title,
+                name=nextEvents['events'][event]['title'],
                 value="{0} von {1} Uhr bis {2} Uhr".format(
-                    '.'.join(reversed(raid.starttime.split(' ')[0].split('-'))),
-                    raid.starttime.split(' ')[1],
-                    raid.starttime.split(' ')[1],
+                    '.'.join(reversed(nextEvents['events'][event]['starttime'].split(' ')[0].split('-'))),
+                    nextEvents['events'][event]['starttime'].split(' ')[1],
+                    nextEvents['events'][event]['starttime'].split(' ')[1],
                 ),
                 inline=False)
+            # event_embed.add_field() TODO: ANMELDESTATUS ANZEIGEN, REAKTION HINZUFÜGEN
         await channel.send(embed=event_embed)
 
     async def help(self, author, channel, args):
@@ -288,7 +299,6 @@ Zum ein- und ausschalten der Anmeldung tippe: `change oneclick` oder `!cddt onec
     async def signupByReaction(self, reaction, user, raidevent):
         self.authorized(user)
         print('start signup process')
-        status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
         note = " "
         skip_signup = False
 
