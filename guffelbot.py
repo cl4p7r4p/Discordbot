@@ -63,6 +63,10 @@ class Guffelbot(discord.Client):
             return
 
         if message.content.startswith('!cddt'):
+            if not isinstance(message.channel, discord.DMChannel):
+                await self.deletemsg(message)
+                await message.author.send("lass uns das hier klären ;)")
+                return
             commands = message.content.split(' ')
             try:
                 await getattr(self, commands[1])(message.author, message.channel, commands[2:])
