@@ -93,6 +93,13 @@ class Guffelbot(discord.Client):
             else:
                 await message.channel.send("Du bist nicht mein Meister :poop:")
 
+        if message.content == 'clean up for real 1337':
+            if message.author.name == "hairypotta":
+                await message.channel.purge(limit=50)
+            else:
+                await message.channel.send("Du bist nicht mein Meister :poop:")
+
+
         if message.content == 'show raids':
             # await self.deletemsg(message)
             if message.author.name == "hairypotta":
@@ -102,14 +109,18 @@ class Guffelbot(discord.Client):
         limit=3
 
         for ev in raidEvents:
-            if ev.isPosted and (int(time.time())-ev.creationTime)<120:
+            if ev.isPosted and (int(time.time())-ev.creationTime)<30:
                 # await message.channel.send("noch zu jung")
                 pass
-            elif ev.isPosted and (int(time.time())-ev.creationTime)>120:
+            elif ev.isPosted and (int(time.time())-ev.creationTime)>30:
                 # await message.channel.send("Anzeige wird aktualisiert")
                 msg = await message.channel.fetch_message(ev.messageID)
-                await ev.update()
-                await msg.edit(embed=ev.embed.embedContent)
+                print("Versuche Embed von Raid {} zu aktualisieren.".format(ev.title))
+                try:
+                    await ev.update()
+                    await msg.edit(embed=ev.embed.embedContent)
+                except:
+                    print("Aktualisierung des Embeds fehgeschlagen.")
 
             elif limit != self.raids_posted:
                 self.raids_posted += 1
@@ -133,14 +144,13 @@ class Guffelbot(discord.Client):
         if user.name == self.user.name:
             return
         print("reaction von {} registriert".format(user.name))
-        if reaction.emoji not in reactions:
-            await reaction.remove(user)
-        elif reaction.emoji=="🔁":
+        if reaction.emoji=="🔁":
             await reaction.remove(user)
             await self.postRaids(reaction.message)
+        elif reaction.emoji not in reactions:
+            await reaction.remove(user)
         else:
             raid = getEventById(eventDic[reaction.message.id])
-            print(raid)
             try:
                 if not isinstance(reaction.message.channel, discord.DMChannel):
                     await reaction.remove(user)
@@ -148,12 +158,6 @@ class Guffelbot(discord.Client):
                 await self.signupByReaction(reaction, user, raid)
             except:
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
-
-# for event in data['events']:
-#     if data['events'][event]['closed'] == 0:
-#         nextEvents.append(data['events'][event]['eventid'])
-#     else:
-#         pass
 
 
     async def next(self, author, channel, args):
@@ -167,9 +171,7 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
                 )
             await channel.send(embed=event_embed)
             nextEvents = await getData(self.registered_users[author.id]['token'], "nextevents")
-            # print(nextEvents)
             for event in nextEvents['events']:
-                # print("Anmeldestatus: {}".format(int(nextEvents['events'][event]['user_status'])+1))
                 raid_embed = discord.Embed(
                 title=nextEvents['events'][event]['title'],
                 description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
@@ -372,7 +374,7 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                         char_id = char_ids[charidx]
                     except Exception as e:
                         print(e)
-                        await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.\nVermutlich ist dein Token falsch. `!cddt help setup` für weitere Instruktionen.")
+                        await msg.channel.send("Bei der Charakterauswahl ist ein Fehler aufgetreten.\nVermutlich ist dein Token falsch. `!cddt help setup` für weitere Instruktionen.")
                         return
                 else:
                     await msg.channel.send("Abgebrochen")
@@ -384,7 +386,6 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
             await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
         r =  await raidevent.signup(self.registered_users[user.id]['token'], char_id, reactStatus[reaction.emoji],note)
         print("response: {}".format(r))
-        print("type: {}".format(type(r)))
         try:
             if r['status'] == 1:
                 success_embed = discord.Embed(
@@ -404,8 +405,14 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                         description="Du hast keine Standardrolle für deinen gewählten Charakter gesetzt. Bitte klicke oben auf den Link um dies nachzuholen."
                     ))
                     return
+                if r['error'] == 'access denied':
+                    await msg.channel.send(embed=discord.Embed(
+                        title="Token ungültig!",
+                        description="Mit !cddt help setup erfährst du, wie du den Token richtig installierst."
+                    ))
+                    return
                 print(r)
-                await msg.channel.send("Das hat nicht geklappt.")
+                await msg.channel.send("Das hat nicht geklappt. Eventuell ist die Raidanmeldung schon geschlossen.")
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
