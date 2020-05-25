@@ -7,7 +7,7 @@ import pickle
 from backend import *
 import config as cf
 
-reactions = ["✅", "🚫", "💤","🔁" ]
+reactions = ["✅", "🚫", "💤"]
 reactDict = {
     "✅": "anmelden", #status 1
     "🚫": "abmelden", #status 2
@@ -18,10 +18,17 @@ reactStatus = {
     "🚫": 2, #status 2
     "💤": 3 #status 3
 }
+status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
+
+eventDic = {}
+raids_posted = 0
+
 class Unauthorized(Exception):
     pass
 
 class Guffelbot(discord.Client):
+
+
     def authorized(self, author):
         if not author.id in self.registered_users:
             raise Unauthorized()
@@ -83,12 +90,12 @@ class Guffelbot(discord.Client):
 
         if message.content == 'show raids':
             # await self.deletemsg(message)
-            await self.postRaids(message)
-
-        if message.content == 'change oneclick':
-            await self.oneclickSwitch(message)
+            if message.author.name == "hairypotta":
+                await self.postRaids(message)
 
     async def postRaids(self,message):
+        limit=3
+
         for ev in raidEvents:
             if ev.isPosted and (int(time.time())-ev.creationTime)<120:
                 # await message.channel.send("noch zu jung")
@@ -99,45 +106,78 @@ class Guffelbot(discord.Client):
                 await ev.update()
                 await msg.edit(embed=ev.embed.embedContent)
 
-            else:
+            elif limit != raids_posted:
+                raids_posted += 1
                 msg = await message.channel.send(embed=ev.embed.embedContent)
                 ev.isPosted = True
                 ev.messageID = msg.id
                 ev.channelID = msg.channel.id
+                eventDic[msg.id] = ev.ID
                 if ev.deadline_ts>int(time.time()):
-                    for emoji in reactions:
-                        await msg.add_reaction(emoji)
+                    await self.addStatusReactions(msg)
+                    await msg.add_reaction("🔁")
+
+    async def addStatusReactions(self,msg):
+        for emoji in reactions:
+            await msg.add_reaction(emoji)
+
+    async def removeStatusReactions(self,msg):
+        return
 
     async def on_reaction_add(self, reaction, user):
-        print("reaction von {} registriert".format(user.name))
-        if  reaction.count < 2:
+        if user.name == self.user.name:
             return
-        elif reaction.emoji not in reactions:
+        print("reaction von {} registriert".format(user.name))
+        if reaction.emoji not in reactions:
             await reaction.remove(user)
         elif reaction.emoji=="🔁":
             await reaction.remove(user)
             await self.postRaids(reaction.message)
         else:
-            raid = findEventByMsgId(reaction.message.id)
+            raid = getEventById(eventDic[reaction.message.id])
+            print(raid)
             try:
-                await reaction.remove(user)
+                if not isinstance(reaction.message.channel, discord.DMChannel):
+                    await reaction.remove(user)
+                print('trying to signup {} ({}) at raid id'.format(user.name,user.id))
                 await self.signupByReaction(reaction, user, raid)
             except:
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
 
+# for event in data['events']:
+#     if data['events'][event]['closed'] == 0:
+#         nextEvents.append(data['events'][event]['eventid'])
+#     else:
+#         pass
+
 
     async def next(self, author, channel, args):
-        event_embed = discord.Embed(title="Kommende Raids")
-        for raid in raidEvents:
-            event_embed.add_field(
-                name=raid.title,
-                value="{0} von {1} Uhr bis {2} Uhr".format(
-                    '.'.join(reversed(raid.starttime.split(' ')[0].split('-'))),
-                    raid.starttime.split(' ')[1],
-                    raid.starttime.split(' ')[1],
-                ),
-                inline=False)
-        await channel.send(embed=event_embed)
+        """__**next**__
+Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung an und ermöglicht dir eine direkte Rückmeldung.
+"""
+        try:
+            event_embed = discord.Embed(
+                title="Kommende Raids",
+                description="Bitte an- oder abmelden mit Klick auf Knopf. :partying_face:"
+                )
+            await channel.send(embed=event_embed)
+            nextEvents = await getData(self.registered_users[author.id]['token'], "nextevents")
+            # print(nextEvents)
+            for event in nextEvents['events']:
+                raid_embed = discord.Embed(
+                title=nextEvents['events'][event]['title'],
+                description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
+                )
+                event_msg = await channel.send(embed=raid_embed)
+                eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
+                await self.addStatusReactions(event_msg)
+
+        except Exception as inst:
+            print(type(inst))    # the exception instance
+            print(inst.args)     # arguments stored in .args
+            print(inst)
+            await channel.send("Aus irgendeinem Grund, kann ich dir gerade keine kommenden Raids zeigen. Sorry.")
+        print(eventDic)
 
     async def help(self, author, channel, args):
         if args == [] or args == None:
@@ -151,8 +191,8 @@ Verfügbare Befehle:
 [Kommende Raids]
 - !cddt next
 
-[Raidstatus]
-- !cddt status
+[1-Klick-Anmeldung]
+- !cddt oneclick
 
 Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
 ```
@@ -163,24 +203,24 @@ Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
                 await channel.send(doc)
             except Exception as e:
                 print(e)
-                await channel.send("Dafür fehlt mir leider der Hilfetext, informiere Theo")
+                await channel.send("Dafür fehlt mir leider der Hilfetext")
 
     async def setup(self, author, channel, args):
         """__**Einrichtung des EQDKP Tokens**__
-    Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite \
+Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite \
 https://cddt-wow.de registriert und freigeschaltet sein.
 
-    Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen \
+Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen \
 Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. Alternativ nutze diesen Link \
     https://cddt-wow.de/index.php/Settings.html?s=.
 
-    Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel` \
+Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel` \
 als `Privater API-Schlüssel`. Du kannst rechts auf `**********` klicken um es dir \
 anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszuführen.
 
 `!cddt setup 12345ab34dc...34255612313`
 
-    Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot. Sonst hat jeder dein Token \
+Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot. Sonst hat jeder dein Token \
 und kann sich unter deinem Namen für Raids anmelden. Sollte dein Token einmal in fremde Hände \
 gelangen, kannst du auf der Webseite, dort wo du auch dein Token gefunden hast, neue Schlüssel generieren \
 und den `setup`-Befehl erneut ausführen.
@@ -224,34 +264,43 @@ und den `setup`-Befehl erneut ausführen.
                 return
             success_embed = discord.Embed(
                 title="1-Klick-Anmeldung startklar",
-                description="Das war ein voller Erfolg. In Zukunft wirst du direkt beim Klick auf die Reaktion mit **{}** entsprechend angemeldet.\n Mit __change oneclick__ kannst du das wieder deaktivieren".format(char_name)
+                description="Das war ein voller Erfolg. In Zukunft wirst du direkt beim Klick auf die Reaktion mit **{}** entsprechend angemeldet.\n Mit `!cddt oneclick` kannst Du das ändern".format(char_name)
             )
             await msg.channel.send(embed=success_embed)
         return
 
-    async def oneclickSwitch(self, msg):
-        if not 'oneclick' in self.registered_users[msg.author.id]:
-            await msg.channel.send("Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\nBitte durchlaufe einmal den regulären Anmeldeprozess mit mir, indem du auf eine Reaktion unter dem Raidevent klickst.")
+    async def oneclick(self, author, channel, args):
+        """__**Die 1-Klick-Anmeldung**__
+Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, dass Du die reguläre Anmeldeprozedur einmal durchlaufen hast. \
+Am Ende der Anmeldung wirst du gefragt, ob du die 1-Klick-Anmeldung freischalten möchtest.\
+Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
+        """
+        if not 'oneclick' in self.registered_users[author.id]:
+            await channel.send("Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\nBitte durchlaufe einmal den regulären Anmeldeprozess mit mir, indem du auf eine Reaktion unter dem Raidevent klickst.")
             return
         else:
-            oneclick_status = self.registered_users[msg.author.id]['oneclick']
-            text = {0:"ausgeschaltet",1:"eingeschaltet"}
-            answer = await self.selection_helper("Die 1-Klick-Anmeldung ist aktuell **{}**. Möchtest du das ändern?".format(text[oneclick_status]), ["Ja", "Nein"], msg.author, msg.channel)
+            oneclick_status = self.registered_users[author.id]['oneclick']
+            text = {0:"ausgeschaltet",1:"eingeschaltet",2:"gelöscht"}
+            answer = await self.selection_helper("Die 1-Klick-Anmeldung ist aktuell **{}**. Möchtest du das ändern?".format(text[oneclick_status]), ["Ja", "Nein", "Reset"], author, channel)
             if answer==1 and oneclick_status==0:
                 new_status = 1
+                self.registered_users[author.id]['oneclick'] = new_status
             elif answer==1 and oneclick_status==1:
                 new_status = 0
+                self.registered_users[author.id]['oneclick'] = new_status
+            elif answer==3:
+                del self.registered_users[author.id]['oneclick']
+                new_status = 2
             else:
-                await msg.channel.send("Die 1-Klick-Anmeldung bleibt **{}**".format(text[oneclick_status]))
+                await channel.send("Die 1-Klick-Anmeldung bleibt **{}**".format(text[oneclick_status]))
                 return
             try:
-                self.registered_users[msg.author.id]['oneclick'] = new_status
                 await self.dumpPickle()
-                await msg.channel.send("Die 1-Klick-Anmeldung wurde **{}**".format(text[new_status]))
+                await channel.send("Die 1-Klick-Anmeldung wurde **{}**".format(text[new_status]))
                 return
             except Exception as e:
                 print(e)
-                await msg.channel.send("Da ging was schief.")
+                await channel.send("Da ging was schief.")
                 return
 
     async def selection_helper(self, prompt, list, author, channel):
@@ -282,8 +331,6 @@ und den `setup`-Befehl erneut ausführen.
 
     async def signupByReaction(self, reaction, user, raidevent):
         self.authorized(user)
-        print('start signup process')
-        status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
         note = " "
         skip_signup = False
 
