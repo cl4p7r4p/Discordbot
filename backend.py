@@ -5,13 +5,6 @@ import time
 import discord
 import config as cf
 
-def findEventByMsgId(id):
-    for event in raidEvents:
-        if event.messageID == id:
-            return event
-    return -1
-
-
 ## RaidEvent Liste initialisieren
 raidEvents = []
 
@@ -22,8 +15,8 @@ server = "cddt-wow.de"
 base_url = protocol + "://" + server
 
 functions = {
-    "list" : "calevents_list&number=3&raids_only=1", ## **number** = anzahl der nächsten Raids
-    "nextevents" : "calevents_list&number=10&raids_only=1", ## **number** = anzahl der nächsten Raids
+    "list" : "calevents_list&number=6&raids_only=1", ## **number** = anzahl der nächsten Raids
+    "nextevents" : "calevents_list&number=6&raids_only=1", ## **number** = anzahl der nächsten Raids
     "details": "calevents_details&eventid=",
     "signup" : "raid_signup&atype=user",
     "comment" : "add_comment&atype=api",
@@ -160,7 +153,7 @@ class EmbedEvent():
 class RaidEvent():
     def __init__(self, title, id, starttime, data):
         self.title = title
-        self.ID = id
+        self.ID = int(id)
         self.starttime = starttime
         self.isPosted = False
         self.messageID =  0
@@ -243,3 +236,24 @@ async def makeRaidEvents(nextEvents):
 async def preperation():
     eventliste = await getNextEvents()
     await makeRaidEvents(eventliste)
+
+def getEventById(id):
+    print("suche Raid mit ID: {}".format(id))
+    for event in raidEvents:
+        if event.ID == int(id):
+            return event
+    return -1
+
+
+# "{0} von {1} Uhr bis {2} Uhr: {3}".format(
+#     '.'.join(reversed(event.get('start').split(' ')[0].split('-'))),
+#     event.get('start').split(' ')[1],
+#     event.get('end').split(' ')[1],
+#     event.get('title')
+
+def timeToStr(zeit):
+    try:
+        str = "{0} um {1} Uhr".format('.'.join(reversed(zeit.split(' ')[0].split('-'))),zeit.split(' ')[1])
+    except:
+        str="Dienstag: 12:32"
+    return str
