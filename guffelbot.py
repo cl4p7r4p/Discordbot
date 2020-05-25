@@ -18,7 +18,7 @@ reactStatus = {
     "🚫": 2, #status 2
     "💤": 3 #status 3
 }
-status_options = [":sparkle: Bestätigt", ":white_check_mark: Angemeldet", ":no_entry_sign: Abgemeldet", ":zzz: Ersatzbank"]
+status_options = [" :sparkle: Bestätigt", " :white_check_mark: Angemeldet", " :no_entry_sign: Abgemeldet", " :zzz: Ersatzbank"," :ghost: **ICH BIN EIN GESPENST**"]
 
 eventDic = {}
 
@@ -169,6 +169,7 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
             nextEvents = await getData(self.registered_users[author.id]['token'], "nextevents")
             # print(nextEvents)
             for event in nextEvents['events']:
+                # print("Anmeldestatus: {}".format(int(nextEvents['events'][event]['user_status'])+1))
                 raid_embed = discord.Embed(
                 title=nextEvents['events'][event]['title'],
                 description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
@@ -371,7 +372,7 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                         char_id = char_ids[charidx]
                     except Exception as e:
                         print(e)
-                        await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
+                        await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.\nVermutlich ist dein Token falsch. `!cddt help setup` für weitere Instruktionen.")
                         return
                 else:
                     await msg.channel.send("Abgebrochen")
