@@ -246,6 +246,7 @@ und den `setup`-Befehl erneut ausführen.
         else:
             await channel.send("Dein Token wird hinzugefügt.")
             self.registered_users[author.id] = {'token':args[0]}
+            self.registered_users[author.id]['username'] = author.name
         await self.dumpPickle()
         return
 
@@ -339,7 +340,8 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
 
     async def signupByReaction(self, reaction, user, raidevent):
         self.authorized(user)
-        note = " "
+        print('Anmeldevorgang für {} begonnen'.format(user.name))
+        note = ""
         skip_signup = False
 
         # wenn für oneclick angemeldet den ganzen kram überspringen.
@@ -358,6 +360,9 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                         char_options = []
                         char_ids = []
                         chars = await getData(self.registered_users[user.id]['token'],"chars")
+                        if chars['chars']==None:
+                            await msg.channel.send("Bitte lege zuerst einen Charakter auf der Homepage an.")
+                            return
                         for char in chars['chars']:
                             print(char)
                             char_options.append(chars['chars'][char]['name'])
@@ -384,7 +389,7 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                 await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
                 return
             await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
-        r =  await raidevent.signup(self.registered_users[user.id]['token'], char_id, reactStatus[reaction.emoji],note)
+        r =  await raidSignup(self.registered_users[user.id]['token'], raidevent.ID, char_id, reactStatus[reaction.emoji],note)
         print("response: {}".format(r))
         try:
             if r['status'] == 1:
@@ -405,14 +410,20 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                         description="Du hast keine Standardrolle für deinen gewählten Charakter gesetzt. Bitte klicke oben auf den Link um dies nachzuholen."
                     ))
                     return
-                if r['error'] == 'access denied':
+                elif r['error'] == 'access denied':
                     await msg.channel.send(embed=discord.Embed(
                         title="Token ungültig!",
                         description="Mit !cddt help setup erfährst du, wie du den Token richtig installierst."
                     ))
                     return
+                elif r['error'] == 'statuschange not allowed':
+                    await msg.channel.send(embed=discord.Embed(
+                        title="Zu spät!",
+                        description="Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die Raidleitung oder deinen Klassenleiter.\nAlternativ kannst du auch auf der Webseite ein Kommentar hinterlassen."
+                    ))
+                    return
                 print(r)
-                await msg.channel.send("Das hat nicht geklappt. Eventuell ist die Raidanmeldung schon geschlossen.")
+                await msg.channel.send("Das hat leider nicht geklappt.")
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args

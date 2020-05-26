@@ -35,7 +35,7 @@ roleDict = {
 classDict = {
     2 : "<:druide:673074897869864990>",
     3 : "<:jger:673074895185248256>",
-    4 : " <:magier:673074898087837717>",
+    4 : "<:magier:673074898087837717>",
     6 : "<:priester:673074898519982081>",
     7 : "<:schurke:673074897450172447>",
     8 : "<:schamane:673074897806950411>",
@@ -60,7 +60,13 @@ class EmbedEvent():
         if x in classDict:
             return classDict[x]
         else:
-            return ""
+            return "?"
+
+    def footerText(self):
+        if int(time.time())>self.deadline_ts:
+            return "Die Raidanmeldung ist bereits geschlossen."
+        else:
+            return "Die Raidanmeldung ist noch bis {} möglich.".format(timeToStr(self.deadline))
 
 
     def getRaidMember(self):
@@ -127,7 +133,7 @@ class EmbedEvent():
 
         embed.add_field(name="Auf der Ersatzbank oder verspätet", value=self.printListToLine(self.ersatzbank), inline=False)
         embed.add_field(name="Abgemeldet", value=self.printListToLine(self.abmeldungen), inline=False)
-        embed.set_footer(text="Die Raidanmeldung ist bis "+self.deadline+" geöffnet.\nBitte klicke für eine Änderung deines Raidstatus auf die entsprechende Reaktion.")
+        embed.set_footer(text=self.footerText())
 
         self.embedContent = embed
 
@@ -153,7 +159,7 @@ class EmbedEvent():
 class RaidEvent():
     def __init__(self, title, id, starttime, data):
         self.title = title
-        self.ID = int(id)
+        self.ID = id
         self.starttime = starttime
         self.isPosted = False
         self.messageID =  0
@@ -171,9 +177,17 @@ class RaidEvent():
             self.embed = EmbedEvent(self.ID, raiddata)
             self.creationTime = int(time.time())
 
-    async def signup(self, token, memberid, status, note):
+
+async def updateEmbed(raidid, embed):
+        raiddata = await getData(cf.mastertoken, "details", raidId)
+        if raiddata == embed.data:
+            return embed
+        else:
+            return EmbedEvent(raidid, raiddata)
+
+async def raidSignup(token, raidid, memberid, status, note):
         payload = {
-            "eventid": self.ID,
+            "eventid": raidid,
             "memberid": memberid,
             "status": status,
         }
@@ -193,7 +207,10 @@ async def getData(token,fun,eventid=0):
         content = await fetch(session, base_url+'/api.php?format=json&atoken='+token+'&function='+functions[fun]+'{}'.format("" if eventid==0 else eventid))
         # convert response to json
         content = json.loads(content)
-    return content
+        if int(content['status'])==1:
+            return content
+        else:
+            return -1
 
 
 async def postData(token,fun,payload):
@@ -222,8 +239,8 @@ async def getRaidDetails(id):
     eventData = await getData(cf.mastertoken,"details",id)
     title = eventData['title']
     start = eventData['start']
-    id = id
-    return title,id,start,eventData
+    raidid = int(id)
+    return title,raidid,start,eventData
 
 
 async def makeRaidEvents(nextEvents):
