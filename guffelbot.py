@@ -40,6 +40,8 @@ class Guffelbot(discord.Client):
         self.curEvents = [] ## List of current Raid IDs
         self.eventDic = {} ## to retrieve raid id by message id {messageID:raidID}
         self.postedRaids = {} ## to retrieve the id of the embed by raid id {raidId:messageId}
+        self.refreshCooldown = 15 ## min. time between embed refreshes
+        self.cdTime = int(time.time())
         try:
             with open('users.pkl', 'rb') as f:
                 self.registered_users = pickle.load(f)
@@ -50,8 +52,8 @@ class Guffelbot(discord.Client):
     async def on_ready(self):
         print('Logged on as', self.user)
         try:
-            # await backend.preperation()
-            print("Kann losgehen")
+            await backend.preperation()
+            print("All set. Let's go!")
         except:
             print("das hat nicht geklappt")
 
@@ -136,6 +138,7 @@ class Guffelbot(discord.Client):
                     if dead_ts>int(time.time()):
                         await self.addStatusReactions(msg)
                         await msg.add_reaction("🔁")
+                self.cdTime = int(time.time())
             self.curEvents = nextEvents
             return
 
@@ -156,9 +159,10 @@ class Guffelbot(discord.Client):
         print("reaction von {} registriert".format(user.name))
         if not isinstance(reaction.message.channel, discord.DMChannel):
             await reaction.remove(user)
-        if reaction.emoji=="🔁":
+        if reaction.emoji=="🔁" and (int(time.time())-self.cdTime)>self.refreshCooldown:
+            self.cdTime = int(time.time())
             await self.postRaids(reaction.message)
-        else:
+        elif reaction.emoji in reactions:
             try:
                 print('trying to signup {} ({}) at raid id'.format(user.name,user.id))
                 await self.signupByReaction(reaction, user)
@@ -167,6 +171,8 @@ class Guffelbot(discord.Client):
                 print(inst.args)     # arguments stored in .args
                 print(inst)
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
+        else:
+            return
 
 
     async def next(self, author, channel, args):
@@ -189,7 +195,6 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
                     event_msg = await channel.send(embed=raid_embed)
                     self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
                     await self.addStatusReactions(event_msg)
-                    print(self.eventDic)
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
