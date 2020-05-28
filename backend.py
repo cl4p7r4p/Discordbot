@@ -35,13 +35,18 @@ roleDict = {
 classDict = {
     2 : "<:druide:673074897869864990>",
     3 : "<:jger:673074895185248256>",
-    4 : " <:magier:673074898087837717>",
+    4 : "<:magier:673074898087837717>",
     6 : "<:priester:673074898519982081>",
     7 : "<:schurke:673074897450172447>",
     8 : "<:schamane:673074897806950411>",
     9 : "<:hexer:673074897790173204>",
     10 : "<:krieger:673074895386837002>"
     }
+
+## structure raidEventDic:
+## {raidId : {title=raidtitle,embed=raidembed,iconURL=...}}
+raidEventDic = {}
+
 
 class EmbedEvent():
     def detailFormat(self):
@@ -60,7 +65,13 @@ class EmbedEvent():
         if x in classDict:
             return classDict[x]
         else:
-            return ""
+            return "?"
+
+    def footerText(self):
+        if int(time.time())>self.deadline_ts:
+            return "Die Raidanmeldung ist bereits geschlossen."
+        else:
+            return "Die Raidanmeldung ist noch bis {} möglich.".format(timeToStr(self.deadline))
 
 
     def getRaidMember(self):
@@ -106,7 +117,7 @@ class EmbedEvent():
 
     def createEmbed(self):
         self.getRaidMember()
-        embed = discord.Embed(title=self.raid_title, url=base_url, description="Datum und Zeit: {}".format(self.raid_date), color=0xa73ee6)
+        embed = discord.Embed(title=self.raid_title, url=base_url, description=self.raid_date, color=0xa73ee6)
         embed.set_author(name="Die drei R präsentieren:")
         embed.set_thumbnail(url=self.iconURL)
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(self.raid_signups,self.raid_maxcount), inline=False)
@@ -127,21 +138,21 @@ class EmbedEvent():
 
         embed.add_field(name="Auf der Ersatzbank oder verspätet", value=self.printListToLine(self.ersatzbank), inline=False)
         embed.add_field(name="Abgemeldet", value=self.printListToLine(self.abmeldungen), inline=False)
-        embed.set_footer(text="Die Raidanmeldung ist bis "+self.deadline+" geöffnet.\nBitte klicke für eine Änderung deines Raidstatus auf die entsprechende Reaktion.")
+        embed.set_footer(text=self.footerText())
 
         self.embedContent = embed
 
-    def __init__(self,id,data):
-        self.id = id
-        self.data = data
+    def __init__(self,RaidObj):
+        self.id = RaidObj.raidid
+        self.data = RaidObj.data
         self.format = 1
-        self.iconURL = base_url + data['icon']
-        self.raid_title = data['title']
-        self.raid_date = data['start']
-        self.deadline = data['deadline']
-        self.deadline_ts = data['deadline_timestamp']
-        self.raid_signups = data['raidstatus']['status0']['count'] + data['raidstatus']['status1']['count']
-        self.raid_maxcount = data['raidstatus']['status0']['maxcount']
+        self.iconURL = RaidObj.iconURL
+        self.raid_title = self.data['title']
+        self.raid_date = self.data['start']
+        self.deadline = self.data['deadline']
+        self.deadline_ts = self.data['deadline_timestamp']
+        self.raid_signups = self.data['raidstatus']['status0']['count'] + self.data['raidstatus']['status1']['count']
+        self.raid_maxcount = self.data['raidstatus']['status0']['maxcount']
         self.anmeldungen = []
         self.abmeldungen = []
         self.ersatzbank = []
@@ -150,30 +161,29 @@ class EmbedEvent():
         self.createEmbed()
 
 
-class RaidEvent():
-    def __init__(self, title, id, starttime, data):
-        self.title = title
-        self.ID = int(id)
-        self.starttime = starttime
-        self.isPosted = False
-        self.messageID =  0
-        self.channelID = 0
+class EventObj():
+    def __init__(self, id, data):
+        self.raidid = id
+        self.data = data
+        self.raid_title = data['title']
+        self.raid_date = data['start']
+        self.deadline = data['deadline']
         self.deadline_ts = data['deadline_timestamp']
-        self.creationTime = int(time.time())
-        self.embed = EmbedEvent(id, data)
         self.iconURL = base_url + data['icon']
+        self.startTime = "Am {}".format(timeToStr(data['start']))
 
-    async def update(self):
-        raiddata = await getData(cf.mastertoken, "details", self.ID)
-        if raiddata == self.embed.data:
-            return
+
+
+async def updateEmbed(raidid, embed):
+        raiddata = await getData(cf.mastertoken, "details", raidId)
+        if raiddata == embed.data:
+            return embed
         else:
-            self.embed = EmbedEvent(self.ID, raiddata)
-            self.creationTime = int(time.time())
+            return EmbedEvent(raidid, raiddata)
 
-    async def signup(self, token, memberid, status, note):
+async def raidSignup(token, raidid, memberid, status, note):
         payload = {
-            "eventid": self.ID,
+            "eventid": raidid,
             "memberid": memberid,
             "status": status,
         }
@@ -193,7 +203,10 @@ async def getData(token,fun,eventid=0):
         content = await fetch(session, base_url+'/api.php?format=json&atoken='+token+'&function='+functions[fun]+'{}'.format("" if eventid==0 else eventid))
         # convert response to json
         content = json.loads(content)
-    return content
+        if int(content['status'])==1:
+            return content
+        else:
+            return -1
 
 
 async def postData(token,fun,payload):
@@ -209,27 +222,31 @@ async def postData(token,fun,payload):
         return -1
 
 async def getNextEvents():
+    ## Function returns list of upcoming event IDs
     nextEvents = []
     data = await getData(cf.mastertoken,"list")
     for event in data['events']:
         if data['events'][event]['closed'] == 0:
-            nextEvents.append(data['events'][event]['eventid'])
+            nextEvents.append(int(data['events'][event]['eventid'])) #make sure its an INT, sometime its STR
         else:
             pass
     return nextEvents
 
 async def getRaidDetails(id):
     eventData = await getData(cf.mastertoken,"details",id)
-    title = eventData['title']
-    start = eventData['start']
-    id = id
-    return title,id,start,eventData
+    raidid = int(id)
+    return EventObj(raidid, eventData)
 
 
 async def makeRaidEvents(nextEvents):
+    # Für jedes Event wird ein Eintrag im EventDictionary angelegt, damit man einfacher auf die Daten zugreifen kann
     for eventid in nextEvents:
-        details = await getRaidDetails(eventid)
-        raidEvents.append(RaidEvent(details[0],details[1],details[2],details[3]))
+        eventObj = await getRaidDetails(eventid)
+        raidEventDic[eventObj.raidid] = {"title":eventObj.raid_title}
+        raidEventDic[eventObj.raidid]["iconURL"] = eventObj.iconURL
+        raidEventDic[eventObj.raidid]["start"] = eventObj.startTime
+        raidEventDic[eventObj.raidid]["embed"] = EmbedEvent(eventObj)
+    return
 
 
 async def preperation():
