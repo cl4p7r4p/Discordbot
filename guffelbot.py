@@ -4,7 +4,7 @@ import asyncio
 import time
 import discord
 import pickle
-from backend import *
+import backend
 import config as cf
 
 reactions = ["✅", "🚫", "💤"]
@@ -20,7 +20,8 @@ reactStatus = {
 }
 status_options = [" :sparkle: Bestätigt", " :white_check_mark: Angemeldet", " :no_entry_sign: Abgemeldet", " :zzz: Ersatzbank"," :ghost: **ICH BIN EIN GESPENST**"]
 
-eventDic = {}
+
+
 
 
 class Unauthorized(Exception):
@@ -36,6 +37,9 @@ class Guffelbot(discord.Client):
 
     def __init__(self, *, loop=None, **options):
         super().__init__(loop=loop, **options)
+        self.curEvents = [] ## List of current Raid IDs
+        self.eventDic = {} ## to retrieve raid id by message id {messageID:raidID}
+        self.postedRaids = {} ## to retrieve the id of the embed by raid id {raidId:messageId}
         try:
             with open('users.pkl', 'rb') as f:
                 self.registered_users = pickle.load(f)
@@ -46,8 +50,8 @@ class Guffelbot(discord.Client):
     async def on_ready(self):
         print('Logged on as', self.user)
         try:
-            await preperation()
-            print("Vorbereitung abgeschlossen")
+            # await backend.preperation()
+            print("Kann losgehen")
         except:
             print("das hat nicht geklappt")
 
@@ -58,16 +62,15 @@ class Guffelbot(discord.Client):
         return m.author == client.user
 
     async def on_message(self, message):
-        # don't respond to ourselves
-        if message.author == self.user:
+        if message.author == self.user: # don't respond to ourselves
             return
 
         if message.content.startswith('!cddt'):
             if not isinstance(message.channel, discord.DMChannel):
                 await self.deletemsg(message)
-                await message.author.send("lass uns das hier klären ;)")
+                await message.author.send("lass uns das hier klären :shushing_face:")
                 return
-            commands = message.content.split(' ')
+            commands = message.content.lower().split(' ')
             try:
                 await getattr(self, commands[1])(message.author, message.channel, commands[2:])
             except Unauthorized:
@@ -87,11 +90,6 @@ class Guffelbot(discord.Client):
                 await client.close()
             else:
                 await message.channel.send("Du bist nicht mein Meister :poop:")
-        if message.content == 'clean up':
-            if message.author.name == "hairypotta":
-                await message.channel.purge(limit=50, check=self.is_me)
-            else:
-                await message.channel.send("Du bist nicht mein Meister :poop:")
 
         if message.content == 'clean up for real 1337':
             if message.author.name == "hairypotta":
@@ -99,63 +97,60 @@ class Guffelbot(discord.Client):
             else:
                 await message.channel.send("Du bist nicht mein Meister :poop:")
 
-
         if message.content == 'show raids':
             # await self.deletemsg(message)
             if message.author.name == "hairypotta":
                 await self.postRaids(message)
 
+
     async def postRaids(self,message):
-        limit=3
+        async with message.channel.typing():
+            nextEvents = await backend.getNextEvents() ## only take first 3 raidIDs
+            await backend.makeRaidEvents(nextEvents)
+            update = self.curEvents == nextEvents
+            for raidid in nextEvents[:3]:
+                raidEmbed = backend.raidEventDic[raidid]["embed"].embedContent
+                dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
+                if update:
+                    print('updating embed')
+                    msg = await message.channel.fetch_message(self.postedRaids[raidid])
+                    await msg.edit(embed=raidEmbed)
+                    if dead_ts<int(time.time()):
+                        await self.clearReactions(msg)
+                else:
+                    print('posting new embed')
+                    msg = await message.channel.send(embed=raidEmbed)
+                    self.postedRaids[raidid] = msg.id
+                    self.eventDic[msg.id] = raidid
+                    if dead_ts>int(time.time()):
+                        await self.addStatusReactions(msg)
+                        await msg.add_reaction("🔁")
+            self.curEvents = nextEvents
+            return
 
-        for ev in raidEvents:
-            if ev.isPosted and (int(time.time())-ev.creationTime)<30:
-                # await message.channel.send("noch zu jung")
-                pass
-            elif ev.isPosted and (int(time.time())-ev.creationTime)>30:
-                # await message.channel.send("Anzeige wird aktualisiert")
-                msg = await message.channel.fetch_message(ev.messageID)
-                print("Versuche Embed von Raid {} zu aktualisieren.".format(ev.title))
-                try:
-                    await ev.update()
-                    await msg.edit(embed=ev.embed.embedContent)
-                except:
-                    print("Aktualisierung des Embeds fehgeschlagen.")
-
-            elif limit != self.raids_posted:
-                self.raids_posted += 1
-                msg = await message.channel.send(embed=ev.embed.embedContent)
-                ev.isPosted = True
-                ev.messageID = msg.id
-                ev.channelID = msg.channel.id
-                eventDic[msg.id] = ev.ID
-                if ev.deadline_ts>int(time.time()):
-                    await self.addStatusReactions(msg)
-                    await msg.add_reaction("🔁")
 
     async def addStatusReactions(self,msg):
         for emoji in reactions:
             await msg.add_reaction(emoji)
+        return
 
-    async def removeStatusReactions(self,msg):
+    async def clearReactions(self,msg):
+        for reaction in msg.reactions:
+            await reaction.remove(msg.author)
         return
 
     async def on_reaction_add(self, reaction, user):
         if user.name == self.user.name:
             return
         print("reaction von {} registriert".format(user.name))
+        if not isinstance(reaction.message.channel, discord.DMChannel):
+            await reaction.remove(user)
         if reaction.emoji=="🔁":
-            await reaction.remove(user)
             await self.postRaids(reaction.message)
-        elif reaction.emoji not in reactions:
-            await reaction.remove(user)
         else:
-            raid = getEventById(eventDic[reaction.message.id])
             try:
-                if not isinstance(reaction.message.channel, discord.DMChannel):
-                    await reaction.remove(user)
                 print('trying to signup {} ({}) at raid id'.format(user.name,user.id))
-                await self.signupByReaction(reaction, user, raid)
+                await self.signupByReaction(reaction, user)
             except:
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
 
@@ -167,17 +162,17 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
         try:
             event_embed = discord.Embed(
                 title="Kommende Raids",
-                description="Bitte an- oder abmelden mit Klick auf Knopf. :partying_face:"
+                description="Bitte an- oder abmelden. :partying_face:"
                 )
             await channel.send(embed=event_embed)
-            nextEvents = await getData(self.registered_users[author.id]['token'], "nextevents")
+            nextEvents = await backend.getData(self.registered_users[author.id]['token'], "nextevents")
             for event in nextEvents['events']:
                 raid_embed = discord.Embed(
                 title=nextEvents['events'][event]['title'],
-                description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
+                description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(backend.timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
                 )
                 event_msg = await channel.send(embed=raid_embed)
-                eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
+                self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
                 await self.addStatusReactions(event_msg)
 
         except Exception as inst:
@@ -185,7 +180,6 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
             print(inst.args)     # arguments stored in .args
             print(inst)
             await channel.send("Aus irgendeinem Grund, kann ich dir gerade keine kommenden Raids zeigen. Sorry.")
-        print(eventDic)
 
     async def help(self, author, channel, args):
         if args == [] or args == None:
@@ -338,28 +332,32 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
         else:
             print('Fehler in der Notizabfrage: Notiz zu kurz')
 
-    async def signupByReaction(self, reaction, user, raidevent):
+    async def signupByReaction(self, reaction, user):
         self.authorized(user)
-        print('Anmeldevorgang für {} begonnen'.format(user.name))
+        raidID = self.eventDic[reaction.message.id]
+        raidevent = backend.raidEventDic[raidID]
         note = ""
         skip_signup = False
 
-        # wenn für oneclick angemeldet den ganzen kram überspringen.
+        print('Anmeldevorgang für {} von {} begonnen'.format(raidevent['title'], user.name))
+
+        # wenn für oneclick angemeldet den ganzen Kram überspringen.
         if 'oneclick' in self.registered_users[user.id]:
             if self.registered_users[user.id]['oneclick']==1:
                 msg = await user.send("1-Klick-Anmeldung läuft")
                 char_id = self.registered_users[user.id]['char_id']
                 skip_signup = True
+                print('skipping signup questions...')
         if not skip_signup:
-            msg = await user.send("Hey {}.".format(user.name))
+            msg = await user.send("Hey {} :wave:".format(user.name))
             try:
                 print('start regular signup process')
-                answer = await self.selection_helper("Du willst Dich für den Raid __**{}**__ **{}**?".format(raidevent.title,reactDict[reaction.emoji]), ["Ja", "Nein"], user, msg.channel)
+                answer = await self.selection_helper("Du willst Dich für den Raid __**{}**__ **{}**?".format(backend.raidEventDic[raidID]['title'],reactDict[reaction.emoji]), ["Ja", "Nein"], user, msg.channel)
                 if answer == 1:
                     try:
                         char_options = []
                         char_ids = []
-                        chars = await getData(self.registered_users[user.id]['token'],"chars")
+                        chars = await backend.getData(self.registered_users[user.id]['token'],"chars")
                         if chars['chars']==None:
                             await msg.channel.send("Bitte lege zuerst einen Charakter auf der Homepage an.")
                             return
@@ -389,15 +387,15 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:`!cddt oneclick`
                 await msg.channel.send("Eine seltsame Auswahl, ich breche den Vorgang ab.")
                 return
             await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
-        r =  await raidSignup(self.registered_users[user.id]['token'], raidevent.ID, char_id, reactStatus[reaction.emoji],note)
+        r =  await backend.raidSignup(self.registered_users[user.id]['token'], raidID, char_id, reactStatus[reaction.emoji],note)
         print("response: {}".format(r))
         try:
             if r['status'] == 1:
                 success_embed = discord.Embed(
                     title="Alles klar!",
-                    description="Dein Status für **{}** am {} wurde aktualisiert.\n **Status:** {}\n**Notiz:** {}".format(raidevent.title,raidevent.starttime,reaction.emoji,note)
+                    description="Dein Status für **{}**\n{} wurde aktualisiert.\n **Status:** {}\n**Notiz:** {}".format(raidevent['title'],raidevent['start'],reaction.emoji,note)
                 )
-                success_embed.set_thumbnail(url=raidevent.iconURL)
+                success_embed.set_thumbnail(url=raidevent['iconURL'])
                 await msg.channel.send(embed=success_embed)
                 ## Ein Klick registrierung anbieten
                 if not 'oneclick' in self.registered_users[user.id]:

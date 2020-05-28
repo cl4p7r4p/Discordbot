@@ -43,6 +43,11 @@ classDict = {
     10 : "<:krieger:673074895386837002>"
     }
 
+## structure raidEventDic:
+## {raidId : {title=raidtitle,embed=raidembed,iconURL=...}}
+raidEventDic = {}
+
+
 class EmbedEvent():
     def detailFormat(self):
         # Function returns the format of signups. 2: roles, 0: classes (used for indexing the tuples)
@@ -112,7 +117,7 @@ class EmbedEvent():
 
     def createEmbed(self):
         self.getRaidMember()
-        embed = discord.Embed(title=self.raid_title, url=base_url, description="Datum und Zeit: {}".format(self.raid_date), color=0xa73ee6)
+        embed = discord.Embed(title=self.raid_title, url=base_url, description=self.raid_date, color=0xa73ee6)
         embed.set_author(name="Die drei R präsentieren:")
         embed.set_thumbnail(url=self.iconURL)
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(self.raid_signups,self.raid_maxcount), inline=False)
@@ -137,17 +142,17 @@ class EmbedEvent():
 
         self.embedContent = embed
 
-    def __init__(self,id,data):
-        self.id = id
-        self.data = data
+    def __init__(self,RaidObj):
+        self.id = RaidObj.raidid
+        self.data = RaidObj.data
         self.format = 1
-        self.iconURL = base_url + data['icon']
-        self.raid_title = data['title']
-        self.raid_date = data['start']
-        self.deadline = data['deadline']
-        self.deadline_ts = data['deadline_timestamp']
-        self.raid_signups = data['raidstatus']['status0']['count'] + data['raidstatus']['status1']['count']
-        self.raid_maxcount = data['raidstatus']['status0']['maxcount']
+        self.iconURL = RaidObj.iconURL
+        self.raid_title = self.data['title']
+        self.raid_date = self.data['start']
+        self.deadline = self.data['deadline']
+        self.deadline_ts = self.data['deadline_timestamp']
+        self.raid_signups = self.data['raidstatus']['status0']['count'] + self.data['raidstatus']['status1']['count']
+        self.raid_maxcount = self.data['raidstatus']['status0']['maxcount']
         self.anmeldungen = []
         self.abmeldungen = []
         self.ersatzbank = []
@@ -155,6 +160,17 @@ class EmbedEvent():
         self.detailFormat()
         self.createEmbed()
 
+
+class EventObj():
+    def __init__(self, id, data):
+        self.raidid = id
+        self.data = data
+        self.raid_title = data['title']
+        self.raid_date = data['start']
+        self.deadline = data['deadline']
+        self.deadline_ts = data['deadline_timestamp']
+        self.iconURL = base_url + data['icon']
+        self.startTime = "Am {}".format(timeToStr(data['start']))
 
 class RaidEvent():
     def __init__(self, title, id, starttime, data):
@@ -226,27 +242,31 @@ async def postData(token,fun,payload):
         return -1
 
 async def getNextEvents():
+    ## Function returns list of upcoming event IDs
     nextEvents = []
     data = await getData(cf.mastertoken,"list")
     for event in data['events']:
         if data['events'][event]['closed'] == 0:
-            nextEvents.append(data['events'][event]['eventid'])
+            nextEvents.append(int(data['events'][event]['eventid'])) #make sure its an INT, sometime its STR
         else:
             pass
     return nextEvents
 
 async def getRaidDetails(id):
     eventData = await getData(cf.mastertoken,"details",id)
-    title = eventData['title']
-    start = eventData['start']
     raidid = int(id)
-    return title,raidid,start,eventData
+    return EventObj(raidid, eventData)
 
 
 async def makeRaidEvents(nextEvents):
+    # Für jedes Event wird ein Eintrag im EventDictionary angelegt, damit man einfacher auf die Daten zugreifen kann
     for eventid in nextEvents:
-        details = await getRaidDetails(eventid)
-        raidEvents.append(RaidEvent(details[0],details[1],details[2],details[3]))
+        eventObj = await getRaidDetails(eventid)
+        raidEventDic[eventObj.raidid] = {"title":eventObj.raid_title}
+        raidEventDic[eventObj.raidid]["iconURL"] = eventObj.iconURL
+        raidEventDic[eventObj.raidid]["start"] = eventObj.startTime
+        raidEventDic[eventObj.raidid]["embed"] = EmbedEvent(eventObj)
+    return
 
 
 async def preperation():
