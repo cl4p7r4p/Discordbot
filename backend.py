@@ -172,26 +172,6 @@ class EventObj():
         self.iconURL = base_url + data['icon']
         self.startTime = "Am {}".format(timeToStr(data['start']))
 
-class RaidEvent():
-    def __init__(self, title, id, starttime, data):
-        self.title = title
-        self.ID = id
-        self.starttime = starttime
-        self.isPosted = False
-        self.messageID =  0
-        self.channelID = 0
-        self.deadline_ts = data['deadline_timestamp']
-        self.creationTime = int(time.time())
-        self.embed = EmbedEvent(id, data)
-        self.iconURL = base_url + data['icon']
-
-    async def update(self):
-        raiddata = await getData(cf.mastertoken, "details", self.ID)
-        if raiddata == self.embed.data:
-            return
-        else:
-            self.embed = EmbedEvent(self.ID, raiddata)
-            self.creationTime = int(time.time())
 
 
 async def updateEmbed(raidid, embed):

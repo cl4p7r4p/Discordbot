@@ -102,12 +102,23 @@ class Guffelbot(discord.Client):
             if message.author.name == "hairypotta":
                 await self.postRaids(message)
 
-
     async def postRaids(self,message):
         async with message.channel.typing():
             nextEvents = await backend.getNextEvents() ## only take first 3 raidIDs
             await backend.makeRaidEvents(nextEvents)
             update = self.curEvents == nextEvents
+            if not update and len(self.postedRaids)>0:
+                #fetch old messages by ID and delete them
+                for msgid in self.postedRaids:
+                    delMsgID = self.postedRaids[msgid]
+                    print('trying to delete msgid {}'.format(delMsgID))
+                    try:
+                        msg = await message.channel.fetch_message(delMsgID)
+                        await msg.delete()
+                        del self.eventDic[delMsgID]
+                    except Exception() as e:
+                        print(e)
+
             for raidid in nextEvents[:3]:
                 raidEmbed = backend.raidEventDic[raidid]["embed"].embedContent
                 dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
@@ -151,7 +162,10 @@ class Guffelbot(discord.Client):
             try:
                 print('trying to signup {} ({}) at raid id'.format(user.name,user.id))
                 await self.signupByReaction(reaction, user)
-            except:
+            except Exception as inst:
+                print(type(inst))    # the exception instance
+                print(inst.args)     # arguments stored in .args
+                print(inst)
                 await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
 
 
@@ -160,21 +174,22 @@ class Guffelbot(discord.Client):
 Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung an und ermöglicht dir eine direkte Rückmeldung.
 """
         try:
-            event_embed = discord.Embed(
-                title="Kommende Raids",
-                description="Bitte an- oder abmelden. :partying_face:"
-                )
-            await channel.send(embed=event_embed)
-            nextEvents = await backend.getData(self.registered_users[author.id]['token'], "nextevents")
-            for event in nextEvents['events']:
-                raid_embed = discord.Embed(
-                title=nextEvents['events'][event]['title'],
-                description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(backend.timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
-                )
-                event_msg = await channel.send(embed=raid_embed)
-                self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
-                await self.addStatusReactions(event_msg)
-
+            async with channel.typing():
+                event_embed = discord.Embed(
+                    title="Kommende Raids",
+                    description="Bitte an- oder abmelden. :partying_face:"
+                    )
+                await channel.send(embed=event_embed)
+                nextEvents = await backend.getData(self.registered_users[author.id]['token'], "nextevents")
+                for event in nextEvents['events']:
+                    raid_embed = discord.Embed(
+                    title=nextEvents['events'][event]['title'],
+                    description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(backend.timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
+                    )
+                    event_msg = await channel.send(embed=raid_embed)
+                    self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
+                    await self.addStatusReactions(event_msg)
+                    print(self.eventDic)
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
