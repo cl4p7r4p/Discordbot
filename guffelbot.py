@@ -170,7 +170,7 @@ class Guffelbot(discord.Client):
                 print(type(inst))    # the exception instance
                 print(inst.args)     # arguments stored in .args
                 print(inst)
-                await user.send("Du hast leider keine gültige Verbindung zur Raidanmeldung. \nUm das zu ändern, folge den Instruktionen die du von mir mit den Zauberworten:\n **!cddt help setup** \n erhältst.")
+                await user.send("Das hat leider nicht geklappt.\nDu hast mir vermutlich deinen Token noch nicht verraten. Um das zu ändern tippe `!cddt help setup`")
         else:
             return
 
@@ -179,6 +179,7 @@ class Guffelbot(discord.Client):
         """__**next**__
 Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung an und ermöglicht dir eine direkte Rückmeldung.
 """
+        self.authorized(author)
         try:
             async with channel.typing():
                 event_embed = discord.Embed(
