@@ -154,7 +154,7 @@ class Guffelbot(discord.Client):
         return
 
     async def on_reaction_add(self, reaction, user):
-        if user.name == self.user.name:
+        if (user.name == self.user.name) or (reaction.message.id not in self.eventDic):
             return
         print("reaction von {} registriert".format(user.name))
         if not isinstance(reaction.message.channel, discord.DMChannel):
