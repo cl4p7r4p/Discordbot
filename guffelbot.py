@@ -21,9 +21,6 @@ reactStatus = {
 status_options = [" :sparkle: Bestätigt", " :white_check_mark: Angemeldet", " :no_entry_sign: Abgemeldet", " :zzz: Ersatzbank"," :ghost: **ICH BIN EIN GESPENST**"]
 
 
-
-
-
 class Unauthorized(Exception):
     pass
 
@@ -105,23 +102,28 @@ class Guffelbot(discord.Client):
                 await self.postRaids(message)
 
     async def postRaids(self,message):
-        async with message.channel.typing():
-            nextEvents = await backend.getNextEvents() ## only take first 3 raidIDs
+        async with message.channel.typing(): ## displays the "typing" emote at avatar to show that bot is working
+            nextEvents = await backend.getNextEvents()
             await backend.makeRaidEvents(nextEvents)
-            update = self.curEvents == nextEvents
+            update = (self.curEvents == nextEvents) ## check if the list of upcoming events has changed
+
             if not update and len(self.postedRaids)>0:
-                #fetch old messages by ID and delete them
-                for msgid in self.postedRaids:
-                    delMsgID = self.postedRaids[msgid]
-                    print('trying to delete msgid {}'.format(delMsgID))
+                ## if the eventlist has changed and events are already posted
+                ## we want to post new embeds and delete the old ones
+                for raidid in self.postedRaids:
+                    delMsgID = self.postedRaids[raidid]
+                    print('trying to find and delete message ID {}'.format(delMsgID))
+
+                    ## try to fetch old messages by ID and delete them
                     try:
                         msg = await message.channel.fetch_message(delMsgID)
                         await msg.delete()
                         del self.eventDic[delMsgID]
-                    except Exception() as e:
-                        print(e)
+                    except Exception as e:
+                        print('Das Löschen des Embeds ist nicht gelungen...')
+                        print(str(e))
 
-            for raidid in nextEvents[:3]:
+            for raidid in nextEvents[:3]: ## only take first 3 raidIDs
                 raidEmbed = backend.raidEventDic[raidid]["embed"].embedContent
                 dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
                 if update:
@@ -164,7 +166,7 @@ class Guffelbot(discord.Client):
             await self.postRaids(reaction.message)
         elif reaction.emoji in reactions:
             try:
-                print('trying to signup {} ({}) at raid id'.format(user.name,user.id))
+                print('trying to signup {} ({})'.format(user.name,user.id))
                 await self.signupByReaction(reaction, user)
             except Exception as inst:
                 print(type(inst))    # the exception instance

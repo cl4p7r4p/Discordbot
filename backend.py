@@ -117,7 +117,7 @@ class EmbedEvent():
 
     def createEmbed(self):
         self.getRaidMember()
-        embed = discord.Embed(title=self.raid_title, url=base_url, description=self.raid_date, color=0xa73ee6)
+        embed = discord.Embed(title=self.raid_title, url=base_url, description=timeToStr(self.raid_date), color=0xa73ee6)
         embed.set_author(name="Die drei R präsentieren:")
         embed.set_thumbnail(url=self.iconURL)
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(self.raid_signups,self.raid_maxcount), inline=False)
