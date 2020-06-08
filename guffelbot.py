@@ -65,6 +65,11 @@ class Guffelbot(discord.Client):
     def is_me(self,m):
         return m.author == client.user
 
+    def clearRaidShow(self):
+        self.postedRaids = {}
+        self.curEvents = []
+        return
+
     async def on_message(self, message):
         if message.author == self.user: # don't respond to ourselves
             return
@@ -98,6 +103,7 @@ class Guffelbot(discord.Client):
         if message.content == 'clean up for real 1337':
             if message.author.name == "hairypotta":
                 await message.channel.purge(limit=50)
+                self.clearRaidShow()
             else:
                 await message.channel.send("Du bist nicht mein Meister :poop:")
 
@@ -108,9 +114,9 @@ class Guffelbot(discord.Client):
 
     async def postRaids(self,message):
         async with message.channel.typing(): ## displays the "typing" emote at avatar to show that bot is working
-            nextEvents = (await backend.getNextEvents())[:NUM_RAIDS] ## retrieving next six IDs, but only take first NUM_RAIDS (3)
+            nextEvents = (await backend.getNextEvents())
             await backend.makeRaidEvents(nextEvents)
-            updateEmbed = (self.curEvents == nextEvents) ## check if the list of upcoming events has changed
+            updateEmbed = (self.curEvents[:NUM_RAIDS] == nextEvents[:NUM_RAIDS]) ## check if the list of upcoming events has changed
 
             if not updateEmbed and len(self.postedRaids)>0:
                 ## if the eventlist has changed and events are already posted
@@ -129,19 +135,26 @@ class Guffelbot(discord.Client):
                         print(str(e))
                 try:
                     self.postedRaids.clear()
-                    print('cleared postedRaids')
+                    print('postedRaids clear')
                 except Exception as e:
                     print(str(e))
 
-            for raidid in nextEvents:
+            for raidid in nextEvents[:NUM_RAIDS]: ## only post NUM_RAIDS embeds
                 raidEmbed = backend.raidEventDic[raidid]["embed"].embedContent
                 dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
                 if updateEmbed:
-                    print('updating embed')
-                    msg = await message.channel.fetch_message(self.postedRaids[raidid])
-                    await msg.edit(embed=raidEmbed)
-                    if dead_ts<int(time.time()):
-                        await self.clearReactions(msg)
+                    try:
+                        print('updating embed')
+                        msg = await message.channel.fetch_message(self.postedRaids[raidid])
+                        await msg.edit(embed=raidEmbed)
+                        if dead_ts<int(time.time()):
+                            await self.clearReactions(msg)
+                    except Exception as e:
+                        await message.channel.send('Ich habe versucht, die Embeds zu updaten. Das ist aber nicht gelungen. Versuch es noch einmal.')
+                        self.clearRaidShow()
+                        print('Error: {}'.format(str(e)))
+                        print('posted raids und curevents resettet')
+                        return
                 else:
                     print('posting new embed')
                     msg = await message.channel.send(embed=raidEmbed)
@@ -199,15 +212,22 @@ Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten Darstellung
                     description="Bitte an- oder abmelden. :partying_face:"
                     )
                 await channel.send(embed=event_embed)
-                nextEvents = await backend.getData(self.registered_users[author.id]['token'], "nextevents")
-                for event in nextEvents['events']:
-                    raid_embed = discord.Embed(
-                    title=nextEvents['events'][event]['title'],
-                    description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(backend.timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
-                    )
-                    event_msg = await channel.send(embed=raid_embed)
-                    self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
-                    await self.addStatusReactions(event_msg)
+                r = await backend.getData(self.registered_users[author.id]['token'], "nextevents")
+                if int(r['status'])==1:
+                    nextEvents = r
+                    for event in nextEvents['events']:
+                        raid_embed = discord.Embed(
+                        title=nextEvents['events'][event]['title'],
+                        description="Datum/Zeit: {}\nDein aktueller Status ist: {}".format(backend.timeToStr(nextEvents['events'][event]['start']),status_options[int(nextEvents['events'][event]['user_status'])])
+                        )
+                        event_msg = await channel.send(embed=raid_embed)
+                        self.eventDic[event_msg.id] = int(nextEvents['events'][event]['eventid'])
+                        await self.addStatusReactions(event_msg)
+                elif int(r['status'])==0:
+                    await channel.send(embed=discord.Embed(
+                        title='Das ging schief :/',
+                        description="Fehler: {}".format(str(r['error']))
+                    ))
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args

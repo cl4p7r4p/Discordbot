@@ -202,10 +202,7 @@ async def getData(token,fun,eventid=0):
         content = await fetch(session, base_url+'/api.php?format=json&atoken='+token+'&function='+functions[fun]+'{}'.format("" if eventid==0 else eventid))
         # convert response to json
         content = json.loads(content)
-        if int(content['status'])==1:
-            return content
-        else:
-            return -1
+        return content
 
 
 async def postData(token,fun,payload):
