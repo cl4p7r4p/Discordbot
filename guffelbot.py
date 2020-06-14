@@ -807,6 +807,16 @@ Bitte teile mir kurz mit, ob ich beim kommenden Raid mit dir rechnen kann.
         self.eventDic[invitation.id] = raidid
         await self.addStatusReactions(invitation)
 
+    async def raidComment(self, channel, raidid):
+        """Provides the functionality for the user to post a comment at raidevent"""
+
+        comment = await self.notehelper(user, channel)
+        response = await backend.postComment(self.registered_users[user.id]['token'],
+                                             raidid,
+                                             comment)
+        # TODO: Text im Notehelper anpassen
+        pass
+
 
 client = Guffelbot()
 

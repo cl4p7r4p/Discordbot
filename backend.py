@@ -274,6 +274,29 @@ async def raidSignup(token, raidid, memberid, status, note):
     return post
 
 
+
+async def postComment(token, raidid, comment: string):
+    """
+    <request>
+        <comment>This is a test comment</comment>	        
+        <page>articles</page>
+        <attachid>12_RAIDID</attachid>
+        <reply_to>0</reply_to>
+    </request>
+    """    
+
+    payload = {
+            "comment": comment,
+            "page": "articles",
+            "attach_id": "12_" + raidid,
+            "reply_to": 0
+        }
+        payload = json.dumps(payload)
+        print("trying to post comment")
+        post = await postData(token,"comment", payload)
+        return post
+    pass
+
 async def fetch(session, url):
     async with session.get(url) as response:
         return await response.text()
