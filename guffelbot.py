@@ -131,8 +131,9 @@ class Guffelbot(discord.Client):
                 # we want to post new embeds and delete the old ones
                 for raidid in self.postedRaids:
                     delMsgID = self.postedRaids[raidid]
-                    print('trying to find and \
-                    delete message ID {}'.format(delMsgID))
+                    print(("""
+                    trying to find and delete message ID {}
+                    """).format(delMsgID))
 
                     # try to fetch old messages by ID and delete them
                     try:
@@ -160,9 +161,10 @@ class Guffelbot(discord.Client):
                         if dead_ts < int(time.time()):
                             await self.clearReactions(msg)
                     except Exception as e:
-                        await message.channel.send('Ich habe versucht, \
-                        die Embeds zu updaten. Das ist aber nicht gelungen. \
-                        Versuch es bitte noch einmal.')
+                        await message.channel.send(("""
+Ich habe versucht, die Embeds zu updaten.
+Das ist aber nicht gelungen. Versuch es bitte noch einmal.
+                        """))
                         self.clearRaidShow()
                         print('Error: {}'.format(str(e)))
                         print('posted raids und curevents resettet')
@@ -208,9 +210,11 @@ class Guffelbot(discord.Client):
                 print(type(inst))    # the exception instance
                 print(inst.args)     # arguments stored in .args
                 print(inst)
-                await user.send("Das hat leider nicht geklappt.\n\
-                Du hast mir vermutlich deinen Token noch nicht verraten. \
-                Um das zu ändern tippe `!cddt help setup`")
+                await user.send("""
+Das hat leider nicht geklappt.\n
+Du hast mir vermutlich deinen Token noch nicht verraten.
+Um das zu ändern tippe `!cddt help setup`
+                """)
         else:
             return
 
@@ -237,13 +241,16 @@ Darstellung an und ermöglicht dir eine direkte Rückmeldung.
                         eventtitle = nextEvents['events'][event]['title']
                         raid_embed = discord.Embed(
                             title=eventtitle,
-                            description="Datum/Zeit: {}\nDein aktueller Status \
-                            ist: {}".format(backend.timeToStr(
-                                nextEvents['events'][event]['start']),
+                            description=(("""
+Datum/Zeit: {}\n
+Dein aktueller Status ist: {}
+                            """).format(
+                                backend.timeToStr(
+                                    nextEvents['events'][event]['start']),
                                 status_options[int(
-                                    nextEvents['events'][event]['user_status']
-                                )])
-                        )
+                                    nextEvents['events'][event]['user_status'])]
+                            )
+                            ))
                         event_msg = await channel.send(embed=raid_embed)
                         self.eventDic[event_msg.id] = eventid
                         await self.addStatusReactions(event_msg)
@@ -333,8 +340,11 @@ und den `setup`-Befehl erneut ausführen.
         return
 
     async def register_OneClick(self, msg, user, char_id, char_name):
-        answer = await self.selection_helper("Möchtest du in Zukunft \
-        die 1-Klick-Anmeldung nutzen?", ["Ja", "Nein"], user, msg.channel)
+        answer = await self.selection_helper(
+            ("Möchtest du in Zukunft die 1-Klick-Anmeldung nutzen?"),
+            ["Ja", "Nein"],
+            user,
+            msg.channel)
         if answer == 1:
             try:
                 self.registered_users[user.id]['oneclick'] = 1
@@ -347,10 +357,12 @@ und den `setup`-Befehl erneut ausführen.
                 return
             success_embed = discord.Embed(
                 title="1-Klick-Anmeldung startklar",
-                description="Das war ein voller Erfolg. In Zukunft wirst du \
-                direkt beim Klick auf die Reaktion mit **{}** entsprechend \
-                angemeldet.\n Mit `!cddt oneclick` kannst Du das \
-                ändern".format(char_name)
+                description=(("""
+                Das war ein voller Erfolg. In Zukunft wirst du
+                direkt beim Klick auf die Reaktion mit **{}** entsprechend
+                angemeldet.\n
+                Mit `!cddt oneclick` kannst Du das ändern
+                """).format(char_name))
             )
             await msg.channel.send(embed=success_embed)
         return
@@ -365,18 +377,18 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
 `!cddt oneclick`
         """
         if 'oneclick' not in self.registered_users[author.id]:
-            await channel.send("Die 1-Klick-Anmeldung ist für dich leider noch \
-             nicht konfiguriert.\nBitte durchlaufe einmal den regulären \
-             Anmeldeprozess mit mir, indem du auf eine Reaktion unter \
-             dem Raidevent klickst."
-                               )
+            await channel.send("""
+Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\n
+Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir,
+indem du auf eine Reaktion unter dem Raidevent klickst.
+            """)
             return
         else:
             oneclick_status = self.registered_users[author.id]['oneclick']
             text = {0: "ausgeschaltet", 1: "eingeschaltet", 2: "gelöscht"}
-            answer = await self.selection_helper("Die 1-Klick-Anmeldung ist \
-            aktuell **{}**. Möchtest du das ändern?".format(
-                text[oneclick_status]),
+            answer = await self.selection_helper(("""
+            Die 1-Klick-Anmeldung ist aktuell **{}**. Möchtest du das ändern?
+            """).format(text[oneclick_status]),
                 ["Ja", "Nein", "Reset"],
                 author,
                 channel)
@@ -390,13 +402,15 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
                 del self.registered_users[author.id]['oneclick']
                 new_status = 2
             else:
-                await channel.send("Die 1-Klick-Anmeldung bleibt \
-                **{}**".format(text[oneclick_status]))
+                await channel.send(("""
+                Die 1-Klick-Anmeldung bleibt **{}**
+                """).format(text[oneclick_status]))
                 return
             try:
                 await self.dumpPickle()
-                await channel.send("Die 1-Klick-Anmeldung wurde \
-                **{}**".format(text[new_status]))
+                await channel.send(("""
+                Die 1-Klick-Anmeldung wurde **{}**
+                """).format(text[new_status]))
                 return
             except Exception as e:
                 print(e)
@@ -451,10 +465,10 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
             msg = await user.send("Hey {} :wave:".format(user.name))
             try:
                 print('start regular signup process')
-                answer = await self.selection_helper("Du willst Dich für \
-                den Raid __**{}**__ **{}**?".format(
-                    raidevent['title'],
-                    reactDict[reaction.emoji]),
+                answer = await self.selection_helper(
+                    ("Du willst Dich für den Raid __**{}**__ **{}**?").format(
+                        raidevent['title'],
+                        reactDict[reaction.emoji]),
                     ["Ja", "Nein"], user,
                     msg.channel)
                 if answer == 1:
@@ -465,8 +479,9 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
                             self.registered_users[user.id]['token'],
                             "chars")
                         if chars['chars'] is None:
-                            await msg.channel.send("Bitte lege zuerst einen \
-                            Charakter auf der Homepage an.")
+                            await msg.channel.send("""
+Bitte lege zuerst einen Charakter auf der Homepage an.
+                            """)
                             return
                         for char in chars['chars']:
                             print(char)
@@ -480,9 +495,12 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
                                 msg.channel) - 1
                         else:
                             charidx = 0
-                        notiz = await self.selection_helper("Möchtest du deiner \
-                        Anmeldung eine Notiz hinzufügen?", ["Ja", "Nein"],
-                                                            user, msg.channel)
+                        notiz = await self.selection_helper(("""
+Möchtest du deiner Anmeldung eine Notiz hinzufügen?
+                        """),
+                                                            ["Ja", "Nein"],
+                                                            user,
+                                                            msg.channel)
                         print("antwort auf notizfrage: {}".format(notiz))
                         if notiz == 1:
                             note = await self.note_helper(user, msg.channel)
@@ -490,17 +508,19 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
                         char_id = char_ids[charidx]
                     except Exception as e:
                         print(e)
-                        await msg.channel.send("Bei der Charakterauswahl ist \
-                        ein Fehler aufgetreten.\nVermutlich ist dein Token \
-                        falsch. `!cddt help setup` für weitere Instruktionen.")
+                        await msg.channel.send("""
+Bei der Charakterauswahl ist ein Fehler aufgetreten.\n
+Vermutlich ist dein Token falsch. `!cddt help setup` für weitere Instruktionen.
+                        """)
                         return
                 else:
                     await msg.channel.send("Abgebrochen")
                     return
             except Exception as e:
                 print(e)
-                await msg.channel.send("Eine seltsame Auswahl, \
-                ich breche den Vorgang ab.")
+                await msg.channel.send("""
+                Eine seltsame Auswahl, ich breche den Vorgang ab.
+                """)
                 return
             await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
         r = await backend.raidSignup(self.registered_users[user.id]['token'],
@@ -511,10 +531,14 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
             if r['status'] == 1:
                 success_embed = discord.Embed(
                     title="Alles klar!",
-                    description="Dein Status für **{}**\n{} wurde \
-                    aktualisiert.\n **Status:** {}\n**Notiz:** {}".format(
-                        raidevent['title'], raidevent['start'],
-                        reaction.emoji, note)
+                    description=("""
+Dein Status für **{}**\n{} wurde aktualisiert.
+**Status:** {}
+**Notiz:** {}
+                    """).format(raidevent['title'],
+                                raidevent['start'],
+                                reaction.emoji,
+                                note)
                 )
                 success_embed.set_thumbnail(url=raidevent['iconURL'])
                 await msg.channel.send(embed=success_embed)
@@ -529,25 +553,28 @@ Zum ein- und ausschalten oder resetten der Anmeldung tippe:
                     await msg.channel.send(embed=discord.Embed(
                         title="Standardrolle setzen!",
                         url="https://cddt-wow.de/index.php/MyCharacters/?s=",
-                        description="Du hast keine Standardrolle für deinen \
-                        gewählten Charakter gesetzt. Bitte klicke oben auf den \
-                        Link um dies nachzuholen."
+                        description=("""
+Du hast keine Standardrolle für deinen gewählten Charakter gesetzt.
+Bitte klicke oben auf den Link um dies nachzuholen.
+                        """)
                     ))
                     return
                 elif r['error'] == 'access denied':
                     await msg.channel.send(embed=discord.Embed(
                         title="Token ungültig!",
-                        description="Mit __!cddt help setup__ erfährst du, \
-                        wie du den Token richtig installierst."
+                        description=("""
+Mit __!cddt help setup__ erfährst du, wie du den Token richtig installierst.
+                                    """)
                     ))
                     return
                 elif r['error'] == 'statuschange not allowed':
                     await msg.channel.send(embed=discord.Embed(
                         title="Zu spät!",
-                        description="Die Raidanmeldung ist bereits geschlossen. \
-                        Bitte wende dich an die Raidleitung oder \
-                        deinen Klassenleiter.\nAlternativ kannst du auch auf \
-                        der Webseite ein Kommentar hinterlassen."
+                        description=(("""
+Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die Raidleitung
+oder deinen Klassenleiter.\nAlternativ kannst du auch auf der Webseite
+mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
+                        """))
                     ))
                     return
                 print(r)
