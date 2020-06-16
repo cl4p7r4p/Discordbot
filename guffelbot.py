@@ -29,6 +29,8 @@ NUM_RAIDS = 3
 
 # ***************************************
 
+# self.user_chars: dict: {userid:['char1', 'char2', ...]}
+
 
 class Unauthorized(Exception):
     pass
@@ -58,6 +60,12 @@ class Guffelbot(discord.Client):
         except Exception as e:
             print('Error >> ', str(e))
             self.registered_users = {}
+        try:
+            with open('user_chars.pkl', 'rb') as f:
+                self.user_chars = pickle.load(f)
+        except Exception as e:
+            print('Error >> ', str(e))
+            self.user_chars = {}
 
     async def on_ready(self):
         print('Logged on as', self.user)
@@ -345,6 +353,14 @@ und den `setup`-Befehl erneut ausführen.
             print(e)
         return
 
+    async def dumpUserChars(self):
+        try:
+            with open('user_chars.pkl', 'wb') as f:
+                pickle.dump(self.user_chars, f)
+        except Exception as e:
+            print(e)
+        return
+
     async def register_OneClick(self, msg, user, char_id, char_name):
         answer = await self.selection_helper(
             ("Möchtest du in Zukunft die 1-Klick-Anmeldung nutzen?"),
@@ -491,8 +507,10 @@ Bitte lege zuerst einen Charakter auf der Homepage an.
                             return
                         for char in chars['chars']:
                             print(char)
-                            char_options.append(chars['chars'][char]['name'])
+                            charname = chars['chars'][char]['name']
+                            char_options.append(charname)
                             char_ids.append(chars['chars'][char]['id'])
+                            await self.addCharToList(user, charname)
                         if len(char_options) > 1:
                             charidx = await self.selection_helper(
                                 "Welcher Charakter?",
@@ -529,9 +547,12 @@ Vermutlich ist dein Token falsch. `!cddt help setup` für weitere Instruktionen.
                 """)
                 return
             await msg.channel.send("Dein Anmeldestatus wird aktualisiert.")
+
         r = await backend.raidSignup(self.registered_users[user.id]['token'],
-                                     raidID, char_id,
-                                     reactStatus[reaction.emoji], note)
+                                     raidID,
+                                     char_id,
+                                     reactStatus[reaction.emoji],
+                                     note)
         print("response: {}".format(r))
         try:
             if r['status'] == 1:
@@ -590,12 +611,27 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
             print(inst.args)     # arguments stored in .args
             print(inst)
 
+    def checkAuth(self, user) -> bool:
+        # check user permissions:
+        auth = False
+        for role in user.roles:
+            if role.name == 'Raidleitung' or role.name == 'Gildenleitung':
+                auth = True
+        # if user.id == 298842487982653441:
+        #     auth = True
+
+        return auth
+
     async def signupReminder(self, reaction, user):
         """
     Funktion checkt ob für Discord User ein Charakter im EQDKP existiert und
     überprüft anschließend, ob dieser schon für den gewünschten Raid angemeldet ist.
     Sollte dies nicht der Fall sein, bietet der Bot eine Raidanmeldung per DM an
         """
+        if not self.checkAuth(user):
+            print('signupReminder: nicht autorisiert')
+            return
+
         raidid = self.eventDic[reaction.message.id]
         guild = self.guilds[0]
         members = guild.members
@@ -604,8 +640,8 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
         msg = await user.send("Hey {} :wave:".format(user.name))
         answer = await self.selection_helper(
             ("""
-Möchtest du, dass ich allen Discord-Nutzern, die einen Charakter auf der HP
-haben und sich noch nicht für den Raid registriert haben, eine Erinnerung per
+Möchtest du, dass ich allen Discord-Nutzern, die einen Charakter auf der HP \
+haben und sich noch nicht für den Raid registriert haben, eine Erinnerung per \
 Direktnachricht zukommen lasse?
              """),
             ["Ja", "Nein"],
@@ -617,35 +653,71 @@ Direktnachricht zukommen lasse?
                 signedUp = False
                 hasChar = False
                 print(f"----- {member.display_name} -------")
-                possible_char_names = re.findall(
-                    r"[\w']+",
-                    member.display_name)
-                for name in possible_char_names:
-                    print('suche {}'.format(name))
-                    if signedUp:
-                        continue
 
-                    resp = await backend.getData(
-                        cf.mastertoken,
-                        fun="search&in=charname&for=" + str(name[:4]),
-                        manual=True
-                    )
-                    if "relevant" in resp:
-                        hasChar = True
-                        for key in resp['relevant']:
-                            charname = resp['relevant'][key]['name_export']
-                            if charname in all_signed_up_members:
-                                signedUp = True
-                                print("Nutzer {} ist mit Charakter {} zurückgemeldet.".format(
-                                    str(member.display_name), str(charname)))
-                    else:
-                        print(f"kein char für {str(name)} gefunden.")
+                print("Schaue in Datenbank...")
+                if member.id in self.user_chars:
+                    hasChar = True
+                    for charname in self.user_chars[member.id]:
+                        signedUp = self.isCharSignedUp(member,
+                                                       charname,
+                                                       all_signed_up_members)
+                if not signedUp:
+                    possible_char_names = re.findall(
+                        r"[\w']+",
+                        member.display_name)
+                    for name in possible_char_names:
+                        print('suche {}'.format(name))
+                        if signedUp:
+                            continue
+
+                        resp = await backend.getData(
+                            cf.mastertoken,
+                            fun="search&in=charname&for=" + str(name[:4]),
+                            manual=True
+                        )
+                        if "relevant" in resp:
+                            hasChar = True
+                            for key in resp['relevant']:
+                                charname = resp['relevant'][key]['name_export']
+                                signedUp = self.isCharSignedUp(member,
+                                                               charname,
+                                                               all_signed_up_members)
+                                await self.addCharToList(member, charname)
+                        else:
+                            print(f"kein char für {str(name)} gefunden.")
+
                 if hasChar and not signedUp:
                     # User zur Anmeldung auffordern
                     await self.sendRaidInvite(member, raidid)
 
                     reminders_send.append(member.display_name)
             await user.send("Es wurde erinnert: {}".format(str(reminders_send)))
+        else:
+            await user.send("Vorgang abgebrochen")
+
+    async def addCharToList(self, user, charname: str):
+        newChars = False
+        # write to userchars collection:
+        if user.id in self.user_chars:
+            if charname in self.user_chars[user.id]:
+                pass
+            else:
+                self.user_chars[user.id].append(charname)
+                newChars = True
+        else:
+            self.user_chars[user.id] = [charname]
+            newChars = True
+        if newChars:
+            print(f'{charname} in Datenbank gesichert')
+            await self.dumpUserChars()
+
+    def isCharSignedUp(self, member, charname: str, signups: str) -> bool:
+        signedUp = False
+        if charname in signups:
+            signedUp = True
+            print("Nutzer {} ist mit Charakter {} zurückgemeldet.".format(
+                str(member.display_name), str(charname)))
+        return signedUp
 
     async def sendRaidInvite(self, user, raidid):
         raid = backend.raidEventDic[raidid]["embed"]
