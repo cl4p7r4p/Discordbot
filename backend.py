@@ -238,14 +238,15 @@ async def fetch(session, url):
         return await response.text()
 
 
-async def getData(token: str, fun: str, eventid=0) -> dict:
+async def getData(token: str, fun: str, eventid=0, manual=False) -> dict:
+    function = fun if manual else functions[fun]
     async with aiohttp.ClientSession() as session:
         content = await fetch(session,
                               base_url
                               + '/api.php?format=json&atoken='
                               + token
                               + '&function='
-                              + functions[fun]
+                              + function
                               + '{}'.format("" if eventid == 0 else eventid))
         # convert response to json
         content = json.loads(content)

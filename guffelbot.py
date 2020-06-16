@@ -202,6 +202,8 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
         print("reaction von {} registriert".format(user.name))
         if not isinstance(reaction.message.channel, discord.DMChannel):
             await reaction.remove(user)
+        if reaction.emoji == "🖕":
+            await self.signupReminder(reaction, user)
         if reaction.emoji == "🔁"\
                 and (int(time.time()) - self.cdTime) > self.refreshCooldown:
             self.cdTime = int(time.time())
@@ -421,7 +423,7 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 await channel.send("Da ging was schief.")
                 return
 
-    async def selection_helper(self, prompt, list, author, channel):
+    async def selection_helper(self, prompt, list, author, channel) -> int:
         def check(message):
             return message.author == author and message.channel == channel
 
@@ -588,26 +590,80 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
             print(inst.args)     # arguments stored in .args
             print(inst)
 
-    async def signupReminder(self, raidid: int):
+    async def signupReminder(self, reaction, user):
         """
     Funktion checkt ob für Discord User ein Charakter im EQDKP existiert und
     überprüft anschließend, ob dieser schon für den gewünschten Raid angemeldet ist.
     Sollte dies nicht der Fall sein, bietet der Bot eine Raidanmeldung per DM an
         """
-        # TODO: IMPLEMENT
+        raidid = self.eventDic[reaction.message.id]
         guild = self.guilds[0]
         members = guild.members
         raid = backend.raidEventDic[raidid]["embed"]
-        all_signed_up_members = raid.getSignedUpMembers(raidid)
+        all_signed_up_members = str(raid.getSignedUpMembers())
+        msg = await user.send("Hey {} :wave:".format(user.name))
+        answer = await self.selection_helper(
+            ("""
+Möchtest du, dass ich allen Discord-Nutzern, die einen Charakter auf der HP
+haben und sich noch nicht für den Raid registriert haben, eine Erinnerung per
+Direktnachricht zukommen lasse?
+             """),
+            ["Ja", "Nein"],
+            user,
+            msg.channel)
+        if answer == 1:
+            reminders_send = []
+            for member in members:
+                signedUp = False
+                hasChar = False
+                print(f"----- {member.display_name} -------")
+                possible_char_names = re.findall(
+                    r"[\w']+",
+                    member.display_name)
+                for name in possible_char_names:
+                    print('suche {}'.format(name))
+                    if signedUp:
+                        continue
 
-        for member in members:
-            print(f"----- {member.name} -------")
-            data = (str(member.name)
-                    + (" " + str(member.nick) if member.nick else "")
+                    resp = await backend.getData(
+                        cf.mastertoken,
+                        fun="search&in=charname&for=" + str(name[:4]),
+                        manual=True
                     )
-            possible_char_names = re.findall(r"[\w']+", data)
+                    if "relevant" in resp:
+                        hasChar = True
+                        for key in resp['relevant']:
+                            charname = resp['relevant'][key]['name_export']
+                            if charname in all_signed_up_members:
+                                signedUp = True
+                                print("Nutzer {} ist mit Charakter {} zurückgemeldet.".format(
+                                    str(member.display_name), str(charname)))
+                    else:
+                        print(f"kein char für {str(name)} gefunden.")
+                if hasChar and not signedUp:
+                    # User zur Anmeldung auffordern
+                    await self.sendRaidInvite(member, raidid)
 
-        pass
+                    reminders_send.append(member.display_name)
+            await user.send("Es wurde erinnert: {}".format(str(reminders_send)))
+
+    async def sendRaidInvite(self, user, raidid):
+        raid = backend.raidEventDic[raidid]["embed"]
+        inviteEmbed = discord.Embed(
+            title="R.S.V.P.",
+            description=("""
+Hier spricht der Captain. Ich habe leider noch nichts von dir gehört.
+Bitte teile mir kurz mit, ob ich beim kommenden Raid mit dir rechnen kann.
+                        """)
+        )
+        inviteEmbed.add_field(name=raid.raid_title,
+                              value=backend.timeToStr(raid.raid_date),
+                              inline=False
+                              )
+        inviteEmbed.set_thumbnail(url=raid.iconURL)
+        invitation = await user.send(embed=inviteEmbed)
+        self.eventDic[invitation.id] = raidid
+        await self.addStatusReactions(invitation)
 
 
 client = Guffelbot()
