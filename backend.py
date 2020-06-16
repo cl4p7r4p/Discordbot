@@ -191,6 +191,13 @@ class EmbedEvent():
         self.detailFormat()
         self.createEmbed()
 
+    def getSignedUpMembers(self) -> list:
+        signedUpMembers = (self.anmeldungen
+                           + self.abmeldungen
+                           + self.ersatzbank)
+
+        return signedUpMembers
+
 
 class EventObj():
     def __init__(self, id, data):

@@ -1,6 +1,10 @@
+# *** python imports ***
 import time
 import discord
 import pickle
+import re
+
+# *** local imports ***
 import backend
 import config as cf
 
@@ -23,7 +27,7 @@ status_options = [" :sparkle: Bestätigt", " :white_check_mark: Angemeldet",
 
 NUM_RAIDS = 3
 
-#####################
+# ***************************************
 
 
 class Unauthorized(Exception):
@@ -220,7 +224,7 @@ Um das zu ändern tippe `!cddt help setup`
 
     async def next(self, author, channel, args):
         """__**next**__
-Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten \
+Diese Funktion zeigt dir die nächsten Raidevents in einer kompakten
 Darstellung an und ermöglicht dir eine direkte Rückmeldung.
 """
         self.authorized(author)
@@ -583,6 +587,27 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
             print(inst)
+
+    async def signupReminder(self, raidid: int):
+        """
+    Funktion checkt ob für Discord User ein Charakter im EQDKP existiert und
+    überprüft anschließend, ob dieser schon für den gewünschten Raid angemeldet ist.
+    Sollte dies nicht der Fall sein, bietet der Bot eine Raidanmeldung per DM an
+        """
+        # TODO: IMPLEMENT
+        guild = self.guilds[0]
+        members = guild.members
+        raid = backend.raidEventDic[raidid]["embed"]
+        all_signed_up_members = raid.getSignedUpMembers(raidid)
+
+        for member in members:
+            print(f"----- {member.name} -------")
+            data = (str(member.name)
+                    + (" " + str(member.nick) if member.nick else "")
+                    )
+            possible_char_names = re.findall(r"[\w']+", data)
+
+        pass
 
 
 client = Guffelbot()
