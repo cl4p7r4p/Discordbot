@@ -39,6 +39,7 @@ class Unauthorized(Exception):
 class Guffelbot(discord.Client):
 
     raids_posted = 0
+    allowed_Roles = ['Gildenleitung', 'Raidleitung']
 
     def authorized(self, author):
         if author.id not in self.registered_users:
@@ -613,14 +614,14 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
 
     def checkAuth(self, user) -> bool:
         # check user permissions:
-        auth = False
         for role in user.roles:
-            if role.name == 'Raidleitung' or role.name == 'Gildenleitung':
-                auth = True
-        # if user.id == 298842487982653441:
-        #     auth = True
+            if role.name in self.allowed_Roles:
+                return True
 
-        return auth
+        if user.id == 298842487982653441:
+            return True
+
+        return False
 
     async def signupReminder(self, reaction, user):
         """
