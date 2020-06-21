@@ -1,6 +1,7 @@
 import aiohttp
 import json
 import time
+from datetime import datetime
 import discord
 import config as cf
 
@@ -44,6 +45,11 @@ classDict = {
     10: "<:krieger:673074895386837002>"
 }
 
+colors = {
+    'green': 0x38f044,
+    'red': 0xdb1d0f
+}
+
 # structure raidEventDic:
 # {raidId : {title=raidtitle,embed=raidembed,iconURL=...}}
 raidEventDic = {}
@@ -69,12 +75,23 @@ class EmbedEvent():
         else:
             return "?"
 
-    def footerText(self):
-        if int(time.time()) > self.deadline_ts:
-            return "Die Raidanmeldung ist bereits geschlossen."
+    def signupPossible(self):
+        return int(time.time()) < self.deadline_ts
+
+    def footerText(self) -> str:
+        timeNow = datetime.now()
+        text = ""
+        strUpdate = "Letztes Update: {}".format(
+            timeNow.strftime("%d.%m. um %H:%M")
+        )
+        if not self.signupPossible():
+            text = "Die Raidanmeldung ist bereits geschlossen."
         else:
-            return "Die Raidanmeldung ist noch bis {} möglich.".format(
+            text = "Die Raidanmeldung ist noch bis {} möglich.".format(
                 timeToStr(self.deadline))
+
+        returnstr = "{} \n{}".format(strUpdate, text)
+        return returnstr
 
     def getRaidMember(self):
         # Charakternamen, Klassen, Rollen und Anmeldestatus extrahieren
@@ -89,21 +106,21 @@ class EmbedEvent():
                             int(chars[char]['classid']),
                             chars[char]['name'] + " (B)",
                             int(categories[category]['id'])
-                            ))
+                        ))
                     elif self.data['raidstatus'][status]['id'] == 1:
                         # Anmeldungen
                         self.anmeldungen.append((
                             int(chars[char]['classid']),
                             chars[char]['name'],
                             int(categories[category]['id'])
-                            ))
+                        ))
                     elif self.data['raidstatus'][status]['id'] == 2:
                         # Abmeldungen
                         self.abmeldungen.append(
                             self.getClassByID(int(chars[char]['classid']))
                             + " "
                             + chars[char]['name']
-                            )
+                        )
                     elif self.data['raidstatus'][status]['id'] == 3:
                         # Ersatzbank
                         self.ersatzbank.append(
@@ -142,8 +159,10 @@ class EmbedEvent():
         embed = discord.Embed(title=self.raid_title,
                               url=base_url,
                               description=timeToStr(self.raid_date),
-                              color=0xa73ee6)
-        embed.set_author(name="Der Club präsentiert:")
+                              color=(
+                                  colors['green'] if self.signupPossible()
+                                  else colors['red'])
+                              )
         embed.set_thumbnail(url=self.iconURL)
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(
             self.raid_signups, self.raid_maxcount), inline=False)
