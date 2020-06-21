@@ -147,13 +147,6 @@ class EmbedEvent():
         else:
             return ":ghost:"
 
-    def printListToLine(self, liste):
-        if len(liste) > 0:
-            str = (', '.join(liste))
-        else:
-            str = "Niemand"
-        return str
-
     def createEmbed(self):
         self.getRaidMember()
         embed = discord.Embed(title=self.raid_title,
@@ -194,10 +187,10 @@ class EmbedEvent():
                 name="Druide", value=self.getListById(2), inline=True)
 
         embed.add_field(name="Auf der Ersatzbank oder verspätet",
-                        value=self.printListToLine(self.ersatzbank),
+                        value=printListToLine(self.ersatzbank),
                         inline=False)
         embed.add_field(name="Abgemeldet",
-                        value=self.printListToLine(self.abmeldungen),
+                        value=printListToLine(self.abmeldungen),
                         inline=False)
         embed.set_footer(text=self.footerText())
 
@@ -350,4 +343,12 @@ def timeToStr(zeit):
     except Exception as e:
         print('Error >> ', str(e))
         str = "Dienstag: 12:32"
+    return str
+
+
+def printListToLine(liste):
+    if len(liste) > 0:
+        str = (', '.join(liste))
+    else:
+        str = "Niemand"
     return str

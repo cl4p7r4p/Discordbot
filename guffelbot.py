@@ -708,8 +708,8 @@ Direktnachricht zukommen lasse?
                     await self.sendRaidInvite(member, raidid)
 
                     reminders_send.append(member.display_name)
-            await user.send("Es wurde erinnert: {}".format(
-                str(reminders_send)
+            await user.send("Es wurde erinnert: \n{}".format(
+                backend.printListToLine(reminders_send)
             ))
         else:
             await user.send("Vorgang abgebrochen")
