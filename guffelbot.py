@@ -97,7 +97,7 @@ class Guffelbot(discord.Client):
                 await self.deletemsg(message)
                 await message.author.send(
                     "lass uns das hier klären :shushing_face:"
-                    )
+                )
                 return
             commands = message.content.lower().split(' ')
             try:
@@ -114,14 +114,14 @@ class Guffelbot(discord.Client):
                 await message.channel.send(embed=auth_embed)
             except Exception as e:
                 print(e)
-                await message.channel.send("Fehler beim Bearbeiten Deiner Anfrage")
+                await message.channel.send(
+                    "Fehler beim Bearbeiten Deiner Anfrage"
+                )
 
         if message.content == 'quitt':
             if message.author.name == "hairypotta":
                 # await self.deletemsg(message)
                 await client.close()
-            else:
-                await message.channel.send("Du bist nicht mein Meister :poop:")
 
         if message.content == 'clean up for real 1337':
             if message.author.name == "hairypotta":
@@ -269,7 +269,7 @@ Dein aktueller Status ist: {}
                                     nextEvents['events'][event]['start']),
                                 status_options[int(
                                     nextEvents['events'][event]['user_status'])
-                                    ]
+                                ]
                             )
                             ))
                         event_msg = await channel.send(embed=raid_embed)
@@ -320,13 +320,17 @@ Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
 Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite
 https://cddt-wow.de registriert und freigeschaltet sein.
 
-Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen
-Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. Alternativ nutze diesen Link
+Navigiere zu den `Registrierungs-Details`, \
+indem du auf der Webseite oben links auf deinen
+Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. \
+Alternativ nutze diesen Link
     https://cddt-wow.de/index.php/Settings.html?s=.
 
-Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel`
-als `Privater API-Schlüssel`. Du kannst rechts auf `**********` klicken um es dir
-anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszuführen.
+Dein Token findest du innerhalb der `Registrierungs-Details` \
+unter `Private Schlüssel`
+als `Privater API-Schlüssel`. Du kannst rechts auf `**********` \
+klicken um es dir anzeigen zu lassen. Kopiere es um dann den \
+`setup`-Befehl mit deinem Token auszuführen.
 
 `!cddt setup 12345ab34dc...34255612313`
         """
@@ -334,7 +338,7 @@ anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszu
         if not isinstance(channel, discord.DMChannel):
             await channel.send(
                 "Bitte mach das in einem privaten Chat mit mir!"
-                )
+            )
             return
         if len(args) < 1:
             await channel.send("Da war leider kein Token dabei.")
@@ -385,8 +389,8 @@ anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszu
                 title="1-Klick-Anmeldung startklar",
                 description=(("""
                 Das war ein voller Erfolg. In Zukunft wirst du \
-                direkt beim Klick auf die Reaktion mit **{name}** entsprechend \
-                angemeldet.\n
+                direkt beim Klick auf die Reaktion mit **{name}** \
+                entsprechend angemeldet.\n
                 Mit `!cddt oneclick` kannst Du das ändern
                 """).format(name=char_name))
             )
@@ -580,7 +584,8 @@ Dein Status für **{}**\n{} wurde aktualisiert.
                                                  char_ids[charidx],
                                                  char_options[charidx])
             else:
-                if r['error'] == 'required data missing' and r['info'] == 'roleid':
+                if r['error'] == 'required data missing' \
+                        and r['info'] == 'roleid':
                     await msg.channel.send(embed=discord.Embed(
                         title="Standardrolle setzen!",
                         url="{server}/index.php/MyCharacters/?s=".format(
@@ -635,9 +640,10 @@ Bitte aktualisiere deinen Token und versuch es erneut.
 
     async def signupReminder(self, reaction, user):
         """
-    Funktion checkt ob für Discord User ein Charakter im EQDKP existiert und
-    überprüft anschließend, ob dieser schon für den gewünschten Raid angemeldet ist.
-    Sollte dies nicht der Fall sein, bietet der Bot eine Raidanmeldung per DM an
+    Funktion checkt ob für Discord User ein Charakter im \
+    EQDKP existiert und überprüft anschließend, \
+    ob dieser schon für den gewünschten Raid angemeldet ist.
+    Sollte dies nicht der Fall sein, bietet der Bot eine Rückmeldung per DM an.
         """
         if not self.checkAuth(user):
             print('signupReminder: nicht autorisiert')
@@ -702,7 +708,9 @@ Direktnachricht zukommen lasse?
                     await self.sendRaidInvite(member, raidid)
 
                     reminders_send.append(member.display_name)
-            await user.send("Es wurde erinnert: {}".format(str(reminders_send)))
+            await user.send("Es wurde erinnert: {}".format(
+                str(reminders_send)
+            ))
         else:
             await user.send("Vorgang abgebrochen")
 
