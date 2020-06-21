@@ -1,5 +1,4 @@
 import aiohttp
-# import asyncio
 import json
 import time
 import discord
@@ -80,24 +79,37 @@ class EmbedEvent():
     def getRaidMember(self):
         # Charakternamen, Klassen, Rollen und Anmeldestatus extrahieren
         for status in self.data['raidstatus']:
-            for category in self.data['raidstatus'][status]['categories']:
-                for char in self.data['raidstatus'][status]['categories'][category]['chars']:
+            categories = self.data['raidstatus'][status]['categories']
+            for category in categories:
+                chars = categories[category]['chars']
+                for char in chars:
                     if self.data['raidstatus'][status]['id'] == 0:
                         # Bestätigte
-                        self.anmeldungen.append((int(self.data['raidstatus'][status]['categories'][category]['chars'][char]['classid']), self.data['raidstatus']
-                                                 [status]['categories'][category]['chars'][char]['name'] + " (B)", int(self.data['raidstatus'][status]['categories'][category]['id'])))
+                        self.anmeldungen.append((
+                            int(chars[char]['classid']),
+                            chars[char]['name'] + " (B)",
+                            int(categories[category]['id'])
+                            ))
                     elif self.data['raidstatus'][status]['id'] == 1:
                         # Anmeldungen
-                        self.anmeldungen.append((int(self.data['raidstatus'][status]['categories'][category]['chars'][char]['classid']), self.data['raidstatus']
-                                                 [status]['categories'][category]['chars'][char]['name'], int(self.data['raidstatus'][status]['categories'][category]['id'])))
+                        self.anmeldungen.append((
+                            int(chars[char]['classid']),
+                            chars[char]['name'],
+                            int(categories[category]['id'])
+                            ))
                     elif self.data['raidstatus'][status]['id'] == 2:
                         # Abmeldungen
-                        self.abmeldungen.append(self.getClassByID(int(self.data['raidstatus'][status]['categories'][category]['chars'][
-                                                char]['classid'])) + " " + self.data['raidstatus'][status]['categories'][category]['chars'][char]['name'])
+                        self.abmeldungen.append(
+                            self.getClassByID(int(chars[char]['classid']))
+                            + " "
+                            + chars[char]['name']
+                            )
                     elif self.data['raidstatus'][status]['id'] == 3:
                         # Ersatzbank
-                        self.ersatzbank.append(self.getClassByID(int(self.data['raidstatus'][status]['categories'][category]['chars'][
-                                               char]['classid'])) + " " + self.data['raidstatus'][status]['categories'][category]['chars'][char]['name'])
+                        self.ersatzbank.append(
+                            self.getClassByID(int(chars[char]['classid']))
+                            + " "
+                            + chars[char]['name'])
                     else:
                         return -1
         self.anmeldungen.sort()

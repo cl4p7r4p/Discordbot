@@ -95,11 +95,16 @@ class Guffelbot(discord.Client):
         if message.content.startswith('!cddt'):
             if not isinstance(message.channel, discord.DMChannel):
                 await self.deletemsg(message)
-                await message.author.send("lass uns das hier klären :shushing_face:")
+                await message.author.send(
+                    "lass uns das hier klären :shushing_face:"
+                    )
                 return
             commands = message.content.lower().split(' ')
             try:
-                await getattr(self, commands[1])(message.author, message.channel, commands[2:])
+                await getattr(self, commands[1])(
+                    message.author,
+                    message.channel,
+                    commands[2:])
             except Unauthorized:
                 auth_embed = discord.Embed(
                     title="Bitte richte zuerst dein Token ein.",
@@ -263,7 +268,8 @@ Dein aktueller Status ist: {}
                                 backend.timeToStr(
                                     nextEvents['events'][event]['start']),
                                 status_options[int(
-                                    nextEvents['events'][event]['user_status'])]
+                                    nextEvents['events'][event]['user_status'])
+                                    ]
                             )
                             ))
                         event_msg = await channel.send(embed=raid_embed)
@@ -323,15 +329,12 @@ als `Privater API-Schlüssel`. Du kannst rechts auf `**********` klicken um es d
 anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszuführen.
 
 `!cddt setup 12345ab34dc...34255612313`
-
-Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot.
-und kann sich unter deinem Namen für Raids anmelden. Sollte dein Token einmal in fremde Hände
-gelangen, kannst du auf der Webseite, dort wo du auch dein Token gefunden hast, neue Schlüssel generieren
-und den `setup`-Befehl erneut ausführen.
         """
 
         if not isinstance(channel, discord.DMChannel):
-            await channel.send("Bitte mach das in einem privaten Chat mit mir!")
+            await channel.send(
+                "Bitte mach das in einem privaten Chat mit mir!"
+                )
             return
         if len(args) < 1:
             await channel.send("Da war leider kein Token dabei.")
@@ -381,28 +384,28 @@ und den `setup`-Befehl erneut ausführen.
             success_embed = discord.Embed(
                 title="1-Klick-Anmeldung startklar",
                 description=(("""
-                Das war ein voller Erfolg. In Zukunft wirst du
-                direkt beim Klick auf die Reaktion mit **{}** entsprechend
+                Das war ein voller Erfolg. In Zukunft wirst du \
+                direkt beim Klick auf die Reaktion mit **{name}** entsprechend \
                 angemeldet.\n
                 Mit `!cddt oneclick` kannst Du das ändern
-                """).format(char_name))
+                """).format(name=char_name))
             )
             await msg.channel.send(embed=success_embed)
         return
 
     async def oneclick(self, author, channel, args):
         """__**Die 1-Klick-Anmeldung**__
-Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, dass Du die reguläre
-Anmeldeprozedur einmal durchlaufen hast.
-Am Ende der Anmeldung wirst du gefragt,
+Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, \
+dass Du die reguläre Anmeldeprozedur einmal durchlaufen hast.
+Am Ende der Anmeldung wirst du gefragt, \
 ob du die 1-Klick-Anmeldung freischalten möchtest. \n
-Zum ein- und ausschalten oder resetten der Anmeldung tippe:
+Zum Ein- und Ausschalten oder Resetten der Anmeldung tippe: \
 `!cddt oneclick`
         """
         if 'oneclick' not in self.registered_users[author.id]:
             await channel.send("""
 Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\n
-Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir,
+Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir, \
 indem du auf eine Reaktion unter dem Raidevent klickst.
             """)
             return
@@ -580,7 +583,8 @@ Dein Status für **{}**\n{} wurde aktualisiert.
                 if r['error'] == 'required data missing' and r['info'] == 'roleid':
                     await msg.channel.send(embed=discord.Embed(
                         title="Standardrolle setzen!",
-                        url="https://cddt-wow.de/index.php/MyCharacters/?s=",
+                        url="{server}/index.php/MyCharacters/?s=".format(
+                            server=backend.base_url),
                         description=("""
 Du hast keine Standardrolle für deinen gewählten Charakter gesetzt.
 Bitte klicke oben auf den Link um dies nachzuholen.
@@ -599,14 +603,20 @@ Mit __!cddt help setup__ erfährst du, wie du den Token richtig installierst.
                     await msg.channel.send(embed=discord.Embed(
                         title="Zu spät!",
                         description=(("""
-Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die Raidleitung
-oder deinen Klassenleiter.\nAlternativ kannst du auch auf der Webseite
-mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
+Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die \
+Raidleitung oder deinen Klassenleiter.
+Alternativ kannst du auch auf der Webseite mit Hilfe der \
+Kommentarfunktion eine Nachricht hinterlassen.
                         """))
                     ))
                     return
-                print(r)
-                await msg.channel.send("Das hat leider nicht geklappt.")
+                # print(r)
+                await msg.channel.send(("""
+Das hat leider nicht geklappt. Eventuell hat sich dein Token geändert.\n
+Das kann hin und wieder passieren. \
+Bitte aktualisiere deinen Token und versuch es erneut.
+`!cddt help setup` für weitere Instruktionen.
+                """))
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
