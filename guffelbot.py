@@ -702,7 +702,8 @@ Direktnachricht zukommen lasse?
              """),
             ["Ja", "Nein"],
             user,
-            msg.channel)
+            msg.channel,
+            to=30.0)
         if answer == 1:
             reminders_send = []
             for member in members:
