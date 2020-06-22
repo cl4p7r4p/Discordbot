@@ -3,6 +3,7 @@ import time
 import discord
 import pickle
 import re
+import asyncio
 
 # *** local imports ***
 import backend
@@ -37,9 +38,9 @@ class Unauthorized(Exception):
 
 
 class Guffelbot(discord.Client):
-
-    raids_posted = 0
     allowed_Roles = ['Gildenleitung', 'Raidleitung']
+    raids_posted = 0
+    reminders_send = {}  # raidid (int) : count (int)
 
     def authorized(self, author):
         if author.id not in self.registered_users:
@@ -124,11 +125,9 @@ class Guffelbot(discord.Client):
                 await client.close()
 
         if message.content == 'clean up for real 1337':
-            if message.author.name == "hairypotta":
+            if self.checkAuth(message.author):
                 await message.channel.purge(limit=50)
                 self.clearRaidShow()
-            else:
-                await message.channel.send("Du bist nicht mein Meister :poop:")
 
         if message.content == 'show raids':
             # await self.deletemsg(message)
@@ -149,9 +148,8 @@ class Guffelbot(discord.Client):
                 # we want to post new embeds and delete the old ones
                 for raidid in self.postedRaids:
                     delMsgID = self.postedRaids[raidid]
-                    print(("""
-                    trying to find and delete message ID {}
-                    """).format(delMsgID))
+                    print("trying to find and delete message ID {}".format(
+                        delMsgID))
 
                     # try to fetch old messages by ID and delete them
                     try:
@@ -172,7 +170,6 @@ class Guffelbot(discord.Client):
                 dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
                 if updateEmbed:
                     try:
-                        print('updating embed')
                         msg = await message.channel.fetch_message(
                             self.postedRaids[raidid])
                         await msg.edit(embed=raidEmbed)
@@ -181,14 +178,13 @@ class Guffelbot(discord.Client):
                     except Exception as e:
                         await message.channel.send(("""
 Ich habe versucht, die Embeds zu updaten.
-Das ist aber nicht gelungen. Versuch es bitte noch einmal.
+Versuch es bitte gleich nochmal.
                         """))
                         self.clearRaidShow()
                         print('Error: {}'.format(str(e)))
                         print('posted raids und curevents resettet')
                         return
                 else:
-                    print('posting new embed')
                     msg = await message.channel.send(embed=raidEmbed)
                     self.postedRaids[raidid] = msg.id
                     self.eventDic[msg.id] = raidid
@@ -197,6 +193,9 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
                         await msg.add_reaction("🔁")
                 self.cdTime = int(time.time())
             self.curEvents = nextEvents
+            print(
+                "updated embeds" if updateEmbed else "posted new embeds"
+            )
             return
 
     async def addStatusReactions(self, msg):
@@ -213,7 +212,7 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
         if (user.name == self.user.name) \
                 or (reaction.message.id not in self.eventDic):
             return
-        print("reaction von {} registriert".format(user.name))
+        print("reaction von {} registriert".format(user.display_name))
         if not isinstance(reaction.message.channel, discord.DMChannel):
             await reaction.remove(user)
         if reaction.emoji == "🖕":
@@ -224,7 +223,7 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
             await self.postRaids(reaction.message)
         elif reaction.emoji in reactions:
             try:
-                print('trying to signup {} ({})'.format(user.name, user.id))
+                print("trying to signup {}".format(user.display_name))
                 await self.signupByReaction(reaction, user)
             except Exception as inst:
                 print(type(inst))    # the exception instance
@@ -262,7 +261,7 @@ Darstellung an und ermöglicht dir eine direkte Rückmeldung.
                         raid_embed = discord.Embed(
                             title=eventtitle,
                             description=(("""
-Datum/Zeit: {}\n
+Datum/Zeit: {}
 Dein aktueller Status ist: {}
                             """).format(
                                 backend.timeToStr(
@@ -374,7 +373,8 @@ klicken um es dir anzeigen zu lassen. Kopiere es um dann den \
             ("Möchtest du in Zukunft die 1-Klick-Anmeldung nutzen?"),
             ["Ja", "Nein"],
             user,
-            msg.channel)
+            msg.channel,
+            to=20.0)
         if answer == 1:
             try:
                 self.registered_users[user.id]['oneclick'] = 1
@@ -408,7 +408,7 @@ Zum Ein- und Ausschalten oder Resetten der Anmeldung tippe: \
         """
         if 'oneclick' not in self.registered_users[author.id]:
             await channel.send("""
-Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\n
+Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.
 Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir, \
 indem du auf eine Reaktion unter dem Raidevent klickst.
             """)
@@ -421,7 +421,8 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
             """).format(text[oneclick_status]),
                 ["Ja", "Nein", "Reset"],
                 author,
-                channel)
+                channel,
+                to=20.0)
             if answer == 1 and oneclick_status == 0:
                 new_status = 1
                 self.registered_users[author.id]['oneclick'] = new_status
@@ -432,22 +433,24 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 del self.registered_users[author.id]['oneclick']
                 new_status = 2
             else:
-                await channel.send(("""
-                Die 1-Klick-Anmeldung bleibt **{}**
-                """).format(text[oneclick_status]))
+                await channel.send(
+                    ("Die 1-Klick-Anmeldung bleibt **{}**").format(
+                        text[oneclick_status])
+                )
                 return
             try:
                 await self.dumpPickle()
-                await channel.send(("""
-                Die 1-Klick-Anmeldung wurde **{}**
-                """).format(text[new_status]))
+                await channel.send(
+                    ("Die 1-Klick-Anmeldung wurde **{}**").format(
+                        text[new_status])
+                )
                 return
             except Exception as e:
                 print(e)
                 await channel.send("Da ging was schief.")
                 return
 
-    async def selection_helper(self, prompt, list, author, channel) -> int:
+    async def selection_helper(self, prompt, list, author, channel, to=None):
         def check(message):
             return message.author == author and message.channel == channel
 
@@ -457,22 +460,34 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
         for i in range(len(list)):
             select_embed.add_field(name=str(i + 1), value=list[i])
         await channel.send(embed=select_embed)
-        msg = await self.wait_for('message', check=check)
-        if int(msg.content) - 1 in range(len(list)):
-            return int(msg.content)
+        try:
+            msg = await self.wait_for('message', check=check, timeout=to)
+        except asyncio.TimeoutError:
+            await channel.send("Keine Antwort erhalten :confused:")
+            return 0
         else:
-            raise ValueError('Out of range')
+            # Falls der Nutzer Bullshit eingibt, wird das hier abgefangen.
+            # und eine 1 zurückgemeldet.
+            try:
+                return int(msg.content)
+            except ValueError:
+                await channel.send(
+                    "Das ist keine Zahl. :person_facepalming:"
+                )
+                return 0
 
     async def note_helper(self, author, channel):
         def check(message):
             return message.author == author and message.channel == channel
 
-        await channel.send("Wie lautet deine Notiz?")
-        msg = await self.wait_for('message', check=check)
-        if len(msg.content) > 0:
-            return str(msg.content)
+        await channel.send("Was willst du mitteilen?")
+        try:
+            msg = await self.wait_for('message', check=check, timeout=60.0)
+        except asyncio.TimeoutError:
+            await channel.send("Keine Antwort erhalten")
+            return ""
         else:
-            print('Fehler in der Notizabfrage: Notiz zu kurz')
+            return str(msg.content)
 
     async def signupByReaction(self, reaction, user):
         self.authorized(user)
@@ -482,7 +497,7 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
         skip_signup = False
 
         print('Anmeldevorgang für {} von {} begonnen'.format(
-            raidevent['title'], user.name))
+            raidevent['title'], user.display_name))
 
         # wenn für oneclick angemeldet den ganzen Kram überspringen.
         if 'oneclick' in self.registered_users[user.id]:
@@ -490,18 +505,24 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 msg = await user.send("1-Klick-Anmeldung läuft")
                 char_id = self.registered_users[user.id]['char_id']
                 skip_signup = True
-                print('skipping signup questions...')
+                print('using one-click')
         if not skip_signup:
-            msg = await user.send("Hey {} :wave:".format(user.name))
+            msg = await user.send("Hey {} :wave:".format(user.display_name))
             try:
                 print('start regular signup process')
                 answer = await self.selection_helper(
                     ("Du willst Dich für den Raid __**{}**__ **{}**?").format(
                         raidevent['title'],
                         reactDict[reaction.emoji]),
-                    ["Ja", "Nein"], user,
-                    msg.channel)
-                if answer == 1:
+                    ["Ja", "Nein"],
+                    user,
+                    msg.channel,
+                    to=20.0
+                )
+                if answer == 0:
+                    await msg.channel.send("Abgebrochen")
+                    return
+                elif answer == 1:
                     try:
                         char_options = []
                         char_ids = []
@@ -509,9 +530,10 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                             self.registered_users[user.id]['token'],
                             "chars")
                         if chars['chars'] is None:
-                            await msg.channel.send("""
-Bitte lege zuerst einen Charakter auf der Homepage an.
-                            """)
+                            await msg.channel.send(
+                                "Kein Charakter für den Benutzer gefunden.\n"
+                                "Bitte lege zuerst einen Char auf der HP an."
+                            )
                             return
                         for char in chars['chars']:
                             print(char)
@@ -520,23 +542,31 @@ Bitte lege zuerst einen Charakter auf der Homepage an.
                             char_ids.append(chars['chars'][char]['id'])
                             await self.addCharToList(user, charname)
                         if len(char_options) > 1:
-                            charidx = await self.selection_helper(
+                            choice = await self.selection_helper(
                                 "Welcher Charakter?",
                                 char_options,
                                 user,
-                                msg.channel) - 1
+                                msg.channel,
+                                to=15.0) - 1
+                            if choice in len(char_options):
+                                charidx = choice
+                            else:
+                                charidx = 0
                         else:
                             charidx = 0
-                        notiz = await self.selection_helper(("""
+                        notiz = await self.selection_helper(
+                            ("""
 Möchtest du deiner Anmeldung eine Notiz hinzufügen?
-                        """),
-                                                            ["Ja", "Nein"],
-                                                            user,
-                                                            msg.channel)
+                            """),
+                            ["Ja", "Nein"],
+                            user,
+                            msg.channel,
+                            to=20.0
+                        )
                         print("antwort auf notizfrage: {}".format(notiz))
                         if notiz == 1:
                             note = await self.note_helper(user, msg.channel)
-                            print("eingegebene notiz: {}".format(note))
+                            # print("eingegebene notiz: {}".format(note))
                         char_id = char_ids[charidx]
                     except Exception as e:
                         print(e)
@@ -632,10 +662,8 @@ Bitte aktualisiere deinen Token und versuch es erneut.
         for role in user.roles:
             if role.name in self.allowed_Roles:
                 return True
-
-        if user.id == 298842487982653441:
+        if user.id == 298842487982653441:  # hairypotta
             return True
-
         return False
 
     async def signupReminder(self, reaction, user):
@@ -652,9 +680,20 @@ Bitte aktualisiere deinen Token und versuch es erneut.
         raidid = self.eventDic[reaction.message.id]
         guild = self.guilds[0]
         members = guild.members
-        raid = backend.raidEventDic[raidid]["embed"]
-        all_signed_up_members = str(raid.getSignedUpMembers())
-        msg = await user.send("Hey {} :wave:".format(user.name))
+        raidevent = backend.raidEventDic[raidid]
+        raid = raidevent["embed"]
+        all_signups = str(raid.getSignedUpMembers())
+        msgtext = (
+            "noch keine" if raidid not in self.reminders_send
+            else f"schon {self.reminders_send[raidid]}"
+        )
+        msg = await user.send(
+            "Für das Event {raidtitle} wurden {text} Erinnerungen verschickt.".
+            format(
+                raidtitle=raidevent['title'],
+                text=msgtext
+            )
+        )
         answer = await self.selection_helper(
             ("""
 Möchtest du, dass ich allen Discord-Nutzern, die einen Charakter auf der HP \
@@ -677,7 +716,7 @@ Direktnachricht zukommen lasse?
                     for charname in self.user_chars[member.id]:
                         signedUp = self.isCharSignedUp(member,
                                                        charname,
-                                                       all_signed_up_members)
+                                                       all_signups)
                 if not signedUp:
                     possible_char_names = re.findall(
                         r"[\w']+",
@@ -698,7 +737,7 @@ Direktnachricht zukommen lasse?
                                 charname = resp['relevant'][key]['name_export']
                                 signedUp = self.isCharSignedUp(member,
                                                                charname,
-                                                               all_signed_up_members)
+                                                               all_signups)
                                 await self.addCharToList(member, charname)
                         else:
                             print(f"kein char für {str(name)} gefunden.")
@@ -711,6 +750,10 @@ Direktnachricht zukommen lasse?
             await user.send("Es wurde erinnert: \n{}".format(
                 backend.printListToLine(reminders_send)
             ))
+            if raidid in self.reminders_send:
+                self.reminders_send[raidid] += 1
+            else:
+                self.reminders_send[raidid] = 1
         else:
             await user.send("Vorgang abgebrochen")
 
