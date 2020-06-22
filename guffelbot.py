@@ -3,6 +3,7 @@ import time
 import discord
 import pickle
 import re
+import asyncio
 
 # *** local imports ***
 import backend
@@ -37,9 +38,9 @@ class Unauthorized(Exception):
 
 
 class Guffelbot(discord.Client):
-
-    raids_posted = 0
     allowed_Roles = ['Gildenleitung', 'Raidleitung']
+    raids_posted = 0
+    reminders_send = {}  # raidid (int) : count (int)
 
     def authorized(self, author):
         if author.id not in self.registered_users:
@@ -95,11 +96,16 @@ class Guffelbot(discord.Client):
         if message.content.startswith('!cddt'):
             if not isinstance(message.channel, discord.DMChannel):
                 await self.deletemsg(message)
-                await message.author.send("lass uns das hier klären :shushing_face:")
+                await message.author.send(
+                    "lass uns das hier klären :shushing_face:"
+                )
                 return
             commands = message.content.lower().split(' ')
             try:
-                await getattr(self, commands[1])(message.author, message.channel, commands[2:])
+                await getattr(self, commands[1])(
+                    message.author,
+                    message.channel,
+                    commands[2:])
             except Unauthorized:
                 auth_embed = discord.Embed(
                     title="Bitte richte zuerst dein Token ein.",
@@ -109,21 +115,19 @@ class Guffelbot(discord.Client):
                 await message.channel.send(embed=auth_embed)
             except Exception as e:
                 print(e)
-                await message.channel.send("Fehler beim Bearbeiten Deiner Anfrage")
+                await message.channel.send(
+                    "Fehler beim Bearbeiten Deiner Anfrage"
+                )
 
         if message.content == 'quitt':
             if message.author.name == "hairypotta":
                 # await self.deletemsg(message)
                 await client.close()
-            else:
-                await message.channel.send("Du bist nicht mein Meister :poop:")
 
         if message.content == 'clean up for real 1337':
-            if message.author.name == "hairypotta":
+            if self.checkAuth(message.author):
                 await message.channel.purge(limit=50)
                 self.clearRaidShow()
-            else:
-                await message.channel.send("Du bist nicht mein Meister :poop:")
 
         if message.content == 'show raids':
             # await self.deletemsg(message)
@@ -144,9 +148,8 @@ class Guffelbot(discord.Client):
                 # we want to post new embeds and delete the old ones
                 for raidid in self.postedRaids:
                     delMsgID = self.postedRaids[raidid]
-                    print(("""
-                    trying to find and delete message ID {}
-                    """).format(delMsgID))
+                    print("trying to find and delete message ID {}".format(
+                        delMsgID))
 
                     # try to fetch old messages by ID and delete them
                     try:
@@ -167,7 +170,6 @@ class Guffelbot(discord.Client):
                 dead_ts = backend.raidEventDic[raidid]["embed"].deadline_ts
                 if updateEmbed:
                     try:
-                        print('updating embed')
                         msg = await message.channel.fetch_message(
                             self.postedRaids[raidid])
                         await msg.edit(embed=raidEmbed)
@@ -176,14 +178,13 @@ class Guffelbot(discord.Client):
                     except Exception as e:
                         await message.channel.send(("""
 Ich habe versucht, die Embeds zu updaten.
-Das ist aber nicht gelungen. Versuch es bitte noch einmal.
+Versuch es bitte gleich nochmal.
                         """))
                         self.clearRaidShow()
                         print('Error: {}'.format(str(e)))
                         print('posted raids und curevents resettet')
                         return
                 else:
-                    print('posting new embed')
                     msg = await message.channel.send(embed=raidEmbed)
                     self.postedRaids[raidid] = msg.id
                     self.eventDic[msg.id] = raidid
@@ -192,6 +193,9 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
                         await msg.add_reaction("🔁")
                 self.cdTime = int(time.time())
             self.curEvents = nextEvents
+            print(
+                "updated embeds" if updateEmbed else "posted new embeds"
+            )
             return
 
     async def addStatusReactions(self, msg):
@@ -208,7 +212,7 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
         if (user.name == self.user.name) \
                 or (reaction.message.id not in self.eventDic):
             return
-        print("reaction von {} registriert".format(user.name))
+        print("reaction von {} registriert".format(user.display_name))
         if not isinstance(reaction.message.channel, discord.DMChannel):
             await reaction.remove(user)
         if reaction.emoji == "🖕":
@@ -219,7 +223,7 @@ Das ist aber nicht gelungen. Versuch es bitte noch einmal.
             await self.postRaids(reaction.message)
         elif reaction.emoji in reactions:
             try:
-                print('trying to signup {} ({})'.format(user.name, user.id))
+                print("trying to signup {}".format(user.display_name))
                 await self.signupByReaction(reaction, user)
             except Exception as inst:
                 print(type(inst))    # the exception instance
@@ -257,13 +261,14 @@ Darstellung an und ermöglicht dir eine direkte Rückmeldung.
                         raid_embed = discord.Embed(
                             title=eventtitle,
                             description=(("""
-Datum/Zeit: {}\n
+Datum/Zeit: {}
 Dein aktueller Status ist: {}
                             """).format(
                                 backend.timeToStr(
                                     nextEvents['events'][event]['start']),
                                 status_options[int(
-                                    nextEvents['events'][event]['user_status'])]
+                                    nextEvents['events'][event]['user_status'])
+                                ]
                             )
                             ))
                         event_msg = await channel.send(embed=raid_embed)
@@ -314,24 +319,25 @@ Mehr Hilfe zu den Befehlen mit: !cddt help <BEFEHL>
 Um die Funktionen des Discord Bots zu nutzen musst du auf der Webseite
 https://cddt-wow.de registriert und freigeschaltet sein.
 
-Navigiere zu den `Registrierungs-Details`, indem du auf der Webseite oben links auf deinen
-Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. Alternativ nutze diesen Link
+Navigiere zu den `Registrierungs-Details`, \
+indem du auf der Webseite oben links auf deinen
+Benutzernamen klickst und dann dem Link zu `Einstellungen` folgst. \
+Alternativ nutze diesen Link
     https://cddt-wow.de/index.php/Settings.html?s=.
 
-Dein Token findest du innerhalb der `Registrierungs-Details` unter `Private Schlüssel`
-als `Privater API-Schlüssel`. Du kannst rechts auf `**********` klicken um es dir
-anzeigen zu lassen. Kopiere es um dann den `setup`-Befehl mit deinem Token auszuführen.
+Dein Token findest du innerhalb der `Registrierungs-Details` \
+unter `Private Schlüssel`
+als `Privater API-Schlüssel`. Du kannst rechts auf `**********` \
+klicken um es dir anzeigen zu lassen. Kopiere es um dann den \
+`setup`-Befehl mit deinem Token auszuführen.
 
 `!cddt setup 12345ab34dc...34255612313`
-
-Benutze den `setup`-Befehl nur in Direktnachrichten mit dem Bot.
-und kann sich unter deinem Namen für Raids anmelden. Sollte dein Token einmal in fremde Hände
-gelangen, kannst du auf der Webseite, dort wo du auch dein Token gefunden hast, neue Schlüssel generieren
-und den `setup`-Befehl erneut ausführen.
         """
 
         if not isinstance(channel, discord.DMChannel):
-            await channel.send("Bitte mach das in einem privaten Chat mit mir!")
+            await channel.send(
+                "Bitte mach das in einem privaten Chat mit mir!"
+            )
             return
         if len(args) < 1:
             await channel.send("Da war leider kein Token dabei.")
@@ -367,7 +373,8 @@ und den `setup`-Befehl erneut ausführen.
             ("Möchtest du in Zukunft die 1-Klick-Anmeldung nutzen?"),
             ["Ja", "Nein"],
             user,
-            msg.channel)
+            msg.channel,
+            to=20.0)
         if answer == 1:
             try:
                 self.registered_users[user.id]['oneclick'] = 1
@@ -381,28 +388,28 @@ und den `setup`-Befehl erneut ausführen.
             success_embed = discord.Embed(
                 title="1-Klick-Anmeldung startklar",
                 description=(("""
-                Das war ein voller Erfolg. In Zukunft wirst du
-                direkt beim Klick auf die Reaktion mit **{}** entsprechend
-                angemeldet.\n
+                Das war ein voller Erfolg. In Zukunft wirst du \
+                direkt beim Klick auf die Reaktion mit **{name}** \
+                entsprechend angemeldet.\n
                 Mit `!cddt oneclick` kannst Du das ändern
-                """).format(char_name))
+                """).format(name=char_name))
             )
             await msg.channel.send(embed=success_embed)
         return
 
     async def oneclick(self, author, channel, args):
         """__**Die 1-Klick-Anmeldung**__
-Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, dass Du die reguläre
-Anmeldeprozedur einmal durchlaufen hast.
-Am Ende der Anmeldung wirst du gefragt,
+Zur Einrichtung der 1-Klick-Anmeldung ist es notwendig, \
+dass Du die reguläre Anmeldeprozedur einmal durchlaufen hast.
+Am Ende der Anmeldung wirst du gefragt, \
 ob du die 1-Klick-Anmeldung freischalten möchtest. \n
-Zum ein- und ausschalten oder resetten der Anmeldung tippe:
+Zum Ein- und Ausschalten oder Resetten der Anmeldung tippe: \
 `!cddt oneclick`
         """
         if 'oneclick' not in self.registered_users[author.id]:
             await channel.send("""
-Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.\n
-Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir,
+Die 1-Klick-Anmeldung ist für dich leider noch nicht konfiguriert.
+Bitte durchlaufe einmal den regulären Anmeldeprozess mit mir, \
 indem du auf eine Reaktion unter dem Raidevent klickst.
             """)
             return
@@ -414,7 +421,8 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
             """).format(text[oneclick_status]),
                 ["Ja", "Nein", "Reset"],
                 author,
-                channel)
+                channel,
+                to=20.0)
             if answer == 1 and oneclick_status == 0:
                 new_status = 1
                 self.registered_users[author.id]['oneclick'] = new_status
@@ -425,22 +433,24 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 del self.registered_users[author.id]['oneclick']
                 new_status = 2
             else:
-                await channel.send(("""
-                Die 1-Klick-Anmeldung bleibt **{}**
-                """).format(text[oneclick_status]))
+                await channel.send(
+                    ("Die 1-Klick-Anmeldung bleibt **{}**").format(
+                        text[oneclick_status])
+                )
                 return
             try:
                 await self.dumpPickle()
-                await channel.send(("""
-                Die 1-Klick-Anmeldung wurde **{}**
-                """).format(text[new_status]))
+                await channel.send(
+                    ("Die 1-Klick-Anmeldung wurde **{}**").format(
+                        text[new_status])
+                )
                 return
             except Exception as e:
                 print(e)
                 await channel.send("Da ging was schief.")
                 return
 
-    async def selection_helper(self, prompt, list, author, channel) -> int:
+    async def selection_helper(self, prompt, list, author, channel, to=None):
         def check(message):
             return message.author == author and message.channel == channel
 
@@ -450,22 +460,34 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
         for i in range(len(list)):
             select_embed.add_field(name=str(i + 1), value=list[i])
         await channel.send(embed=select_embed)
-        msg = await self.wait_for('message', check=check)
-        if int(msg.content) - 1 in range(len(list)):
-            return int(msg.content)
+        try:
+            msg = await self.wait_for('message', check=check, timeout=to)
+        except asyncio.TimeoutError:
+            await channel.send("Keine Antwort erhalten :confused:")
+            return 0
         else:
-            raise ValueError('Out of range')
+            # Falls der Nutzer Bullshit eingibt, wird das hier abgefangen.
+            # und eine 1 zurückgemeldet.
+            try:
+                return int(msg.content)
+            except ValueError:
+                await channel.send(
+                    "Das ist keine Zahl. :person_facepalming:"
+                )
+                return 0
 
     async def note_helper(self, author, channel):
         def check(message):
             return message.author == author and message.channel == channel
 
-        await channel.send("Wie lautet deine Notiz?")
-        msg = await self.wait_for('message', check=check)
-        if len(msg.content) > 0:
-            return str(msg.content)
+        await channel.send("Was willst du mitteilen?")
+        try:
+            msg = await self.wait_for('message', check=check, timeout=60.0)
+        except asyncio.TimeoutError:
+            await channel.send("Keine Antwort erhalten")
+            return ""
         else:
-            print('Fehler in der Notizabfrage: Notiz zu kurz')
+            return str(msg.content)
 
     async def signupByReaction(self, reaction, user):
         self.authorized(user)
@@ -475,7 +497,7 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
         skip_signup = False
 
         print('Anmeldevorgang für {} von {} begonnen'.format(
-            raidevent['title'], user.name))
+            raidevent['title'], user.display_name))
 
         # wenn für oneclick angemeldet den ganzen Kram überspringen.
         if 'oneclick' in self.registered_users[user.id]:
@@ -483,18 +505,24 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 msg = await user.send("1-Klick-Anmeldung läuft")
                 char_id = self.registered_users[user.id]['char_id']
                 skip_signup = True
-                print('skipping signup questions...')
+                print('using one-click')
         if not skip_signup:
-            msg = await user.send("Hey {} :wave:".format(user.name))
+            msg = await user.send("Hey {} :wave:".format(user.display_name))
             try:
                 print('start regular signup process')
                 answer = await self.selection_helper(
                     ("Du willst Dich für den Raid __**{}**__ **{}**?").format(
                         raidevent['title'],
                         reactDict[reaction.emoji]),
-                    ["Ja", "Nein"], user,
-                    msg.channel)
-                if answer == 1:
+                    ["Ja", "Nein"],
+                    user,
+                    msg.channel,
+                    to=20.0
+                )
+                if answer == 0:
+                    await msg.channel.send("Abgebrochen")
+                    return
+                elif answer == 1:
                     try:
                         char_options = []
                         char_ids = []
@@ -502,9 +530,10 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                             self.registered_users[user.id]['token'],
                             "chars")
                         if chars['chars'] is None:
-                            await msg.channel.send("""
-Bitte lege zuerst einen Charakter auf der Homepage an.
-                            """)
+                            await msg.channel.send(
+                                "Kein Charakter für den Benutzer gefunden.\n"
+                                "Bitte lege zuerst einen Char auf der HP an."
+                            )
                             return
                         for char in chars['chars']:
                             print(char)
@@ -513,23 +542,31 @@ Bitte lege zuerst einen Charakter auf der Homepage an.
                             char_ids.append(chars['chars'][char]['id'])
                             await self.addCharToList(user, charname)
                         if len(char_options) > 1:
-                            charidx = await self.selection_helper(
+                            choice = await self.selection_helper(
                                 "Welcher Charakter?",
                                 char_options,
                                 user,
-                                msg.channel) - 1
+                                msg.channel,
+                                to=15.0) - 1
+                            if choice in len(char_options):
+                                charidx = choice
+                            else:
+                                charidx = 0
                         else:
                             charidx = 0
-                        notiz = await self.selection_helper(("""
+                        notiz = await self.selection_helper(
+                            ("""
 Möchtest du deiner Anmeldung eine Notiz hinzufügen?
-                        """),
-                                                            ["Ja", "Nein"],
-                                                            user,
-                                                            msg.channel)
+                            """),
+                            ["Ja", "Nein"],
+                            user,
+                            msg.channel,
+                            to=20.0
+                        )
                         print("antwort auf notizfrage: {}".format(notiz))
                         if notiz == 1:
                             note = await self.note_helper(user, msg.channel)
-                            print("eingegebene notiz: {}".format(note))
+                            # print("eingegebene notiz: {}".format(note))
                         char_id = char_ids[charidx]
                     except Exception as e:
                         print(e)
@@ -577,10 +614,12 @@ Dein Status für **{}**\n{} wurde aktualisiert.
                                                  char_ids[charidx],
                                                  char_options[charidx])
             else:
-                if r['error'] == 'required data missing' and r['info'] == 'roleid':
+                if r['error'] == 'required data missing' \
+                        and r['info'] == 'roleid':
                     await msg.channel.send(embed=discord.Embed(
                         title="Standardrolle setzen!",
-                        url="https://cddt-wow.de/index.php/MyCharacters/?s=",
+                        url="{server}/index.php/MyCharacters/?s=".format(
+                            server=backend.base_url),
                         description=("""
 Du hast keine Standardrolle für deinen gewählten Charakter gesetzt.
 Bitte klicke oben auf den Link um dies nachzuholen.
@@ -599,14 +638,20 @@ Mit __!cddt help setup__ erfährst du, wie du den Token richtig installierst.
                     await msg.channel.send(embed=discord.Embed(
                         title="Zu spät!",
                         description=(("""
-Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die Raidleitung
-oder deinen Klassenleiter.\nAlternativ kannst du auch auf der Webseite
-mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
+Die Raidanmeldung ist bereits geschlossen. Bitte wende dich an die \
+Raidleitung oder deinen Klassenleiter.
+Alternativ kannst du auch auf der Webseite mit Hilfe der \
+Kommentarfunktion eine Nachricht hinterlassen.
                         """))
                     ))
                     return
-                print(r)
-                await msg.channel.send("Das hat leider nicht geklappt.")
+                # print(r)
+                await msg.channel.send(("""
+Das hat leider nicht geklappt. Eventuell hat sich dein Token geändert.\n
+Das kann hin und wieder passieren. \
+Bitte aktualisiere deinen Token und versuch es erneut.
+`!cddt help setup` für weitere Instruktionen.
+                """))
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
@@ -617,17 +662,16 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
         for role in user.roles:
             if role.name in self.allowed_Roles:
                 return True
-
-        if user.id == 298842487982653441:
+        if user.id == 298842487982653441:  # hairypotta
             return True
-
         return False
 
     async def signupReminder(self, reaction, user):
         """
-    Funktion checkt ob für Discord User ein Charakter im EQDKP existiert und
-    überprüft anschließend, ob dieser schon für den gewünschten Raid angemeldet ist.
-    Sollte dies nicht der Fall sein, bietet der Bot eine Raidanmeldung per DM an
+    Funktion checkt ob für Discord User ein Charakter im \
+    EQDKP existiert und überprüft anschließend, \
+    ob dieser schon für den gewünschten Raid angemeldet ist.
+    Sollte dies nicht der Fall sein, bietet der Bot eine Rückmeldung per DM an.
         """
         if not self.checkAuth(user):
             print('signupReminder: nicht autorisiert')
@@ -636,9 +680,20 @@ mit Hilfe der Kommentarfunktion eine Nachricht hinterlassen.
         raidid = self.eventDic[reaction.message.id]
         guild = self.guilds[0]
         members = guild.members
-        raid = backend.raidEventDic[raidid]["embed"]
-        all_signed_up_members = str(raid.getSignedUpMembers())
-        msg = await user.send("Hey {} :wave:".format(user.name))
+        raidevent = backend.raidEventDic[raidid]
+        raid = raidevent["embed"]
+        all_signups = str(raid.getSignedUpMembers())
+        msgtext = (
+            "noch keine" if raidid not in self.reminders_send
+            else f"schon {self.reminders_send[raidid]}"
+        )
+        msg = await user.send(
+            "Für das Event {raidtitle} wurden {text} Erinnerungen verschickt.".
+            format(
+                raidtitle=raidevent['title'],
+                text=msgtext
+            )
+        )
         answer = await self.selection_helper(
             ("""
 Möchtest du, dass ich allen Discord-Nutzern, die einen Charakter auf der HP \
@@ -661,7 +716,7 @@ Direktnachricht zukommen lasse?
                     for charname in self.user_chars[member.id]:
                         signedUp = self.isCharSignedUp(member,
                                                        charname,
-                                                       all_signed_up_members)
+                                                       all_signups)
                 if not signedUp:
                     possible_char_names = re.findall(
                         r"[\w']+",
@@ -682,7 +737,7 @@ Direktnachricht zukommen lasse?
                                 charname = resp['relevant'][key]['name_export']
                                 signedUp = self.isCharSignedUp(member,
                                                                charname,
-                                                               all_signed_up_members)
+                                                               all_signups)
                                 await self.addCharToList(member, charname)
                         else:
                             print(f"kein char für {str(name)} gefunden.")
@@ -692,7 +747,13 @@ Direktnachricht zukommen lasse?
                     await self.sendRaidInvite(member, raidid)
 
                     reminders_send.append(member.display_name)
-            await user.send("Es wurde erinnert: {}".format(str(reminders_send)))
+            await user.send("Es wurde erinnert: \n{}".format(
+                backend.printListToLine(reminders_send)
+            ))
+            if raidid in self.reminders_send:
+                self.reminders_send[raidid] += 1
+            else:
+                self.reminders_send[raidid] = 1
         else:
             await user.send("Vorgang abgebrochen")
 

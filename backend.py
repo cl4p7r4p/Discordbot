@@ -1,7 +1,7 @@
 import aiohttp
-# import asyncio
 import json
 import time
+from datetime import datetime
 import discord
 import config as cf
 
@@ -45,6 +45,11 @@ classDict = {
     10: "<:krieger:673074895386837002>"
 }
 
+colors = {
+    'green': 0x38f044,
+    'red': 0xdb1d0f
+}
+
 # structure raidEventDic:
 # {raidId : {title=raidtitle,embed=raidembed,iconURL=...}}
 raidEventDic = {}
@@ -70,34 +75,58 @@ class EmbedEvent():
         else:
             return "?"
 
-    def footerText(self):
-        if int(time.time()) > self.deadline_ts:
-            return "Die Raidanmeldung ist bereits geschlossen."
+    def signupPossible(self):
+        return int(time.time()) < self.deadline_ts
+
+    def footerText(self) -> str:
+        timeNow = datetime.now()
+        text = ""
+        strUpdate = "Letztes Update: {}".format(
+            timeNow.strftime("%d.%m. um %H:%M")
+        )
+        if not self.signupPossible():
+            text = "Die Raidanmeldung ist bereits geschlossen."
         else:
-            return "Die Raidanmeldung ist noch bis {} möglich.".format(
+            text = "Die Raidanmeldung ist noch bis {} möglich.".format(
                 timeToStr(self.deadline))
+
+        returnstr = "{} \n{}".format(strUpdate, text)
+        return returnstr
 
     def getRaidMember(self):
         # Charakternamen, Klassen, Rollen und Anmeldestatus extrahieren
         for status in self.data['raidstatus']:
-            for category in self.data['raidstatus'][status]['categories']:
-                for char in self.data['raidstatus'][status]['categories'][category]['chars']:
+            categories = self.data['raidstatus'][status]['categories']
+            for category in categories:
+                chars = categories[category]['chars']
+                for char in chars:
                     if self.data['raidstatus'][status]['id'] == 0:
                         # Bestätigte
-                        self.anmeldungen.append((int(self.data['raidstatus'][status]['categories'][category]['chars'][char]['classid']), self.data['raidstatus']
-                                                 [status]['categories'][category]['chars'][char]['name'] + " (B)", int(self.data['raidstatus'][status]['categories'][category]['id'])))
+                        self.anmeldungen.append((
+                            int(chars[char]['classid']),
+                            chars[char]['name'] + " (B)",
+                            int(categories[category]['id'])
+                        ))
                     elif self.data['raidstatus'][status]['id'] == 1:
                         # Anmeldungen
-                        self.anmeldungen.append((int(self.data['raidstatus'][status]['categories'][category]['chars'][char]['classid']), self.data['raidstatus']
-                                                 [status]['categories'][category]['chars'][char]['name'], int(self.data['raidstatus'][status]['categories'][category]['id'])))
+                        self.anmeldungen.append((
+                            int(chars[char]['classid']),
+                            chars[char]['name'],
+                            int(categories[category]['id'])
+                        ))
                     elif self.data['raidstatus'][status]['id'] == 2:
                         # Abmeldungen
-                        self.abmeldungen.append(self.getClassByID(int(self.data['raidstatus'][status]['categories'][category]['chars'][
-                                                char]['classid'])) + " " + self.data['raidstatus'][status]['categories'][category]['chars'][char]['name'])
+                        self.abmeldungen.append(
+                            self.getClassByID(int(chars[char]['classid']))
+                            + " "
+                            + chars[char]['name']
+                        )
                     elif self.data['raidstatus'][status]['id'] == 3:
                         # Ersatzbank
-                        self.ersatzbank.append(self.getClassByID(int(self.data['raidstatus'][status]['categories'][category]['chars'][
-                                               char]['classid'])) + " " + self.data['raidstatus'][status]['categories'][category]['chars'][char]['name'])
+                        self.ersatzbank.append(
+                            self.getClassByID(int(chars[char]['classid']))
+                            + " "
+                            + chars[char]['name'])
                     else:
                         return -1
         self.anmeldungen.sort()
@@ -118,20 +147,15 @@ class EmbedEvent():
         else:
             return ":ghost:"
 
-    def printListToLine(self, liste):
-        if len(liste) > 0:
-            str = (', '.join(liste))
-        else:
-            str = "Niemand"
-        return str
-
     def createEmbed(self):
         self.getRaidMember()
         embed = discord.Embed(title=self.raid_title,
                               url=base_url,
                               description=timeToStr(self.raid_date),
-                              color=0xa73ee6)
-        embed.set_author(name="Der Club präsentiert:")
+                              color=(
+                                  colors['green'] if self.signupPossible()
+                                  else colors['red'])
+                              )
         embed.set_thumbnail(url=self.iconURL)
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(
             self.raid_signups, self.raid_maxcount), inline=False)
@@ -163,10 +187,10 @@ class EmbedEvent():
                 name="Druide", value=self.getListById(2), inline=True)
 
         embed.add_field(name="Auf der Ersatzbank oder verspätet",
-                        value=self.printListToLine(self.ersatzbank),
+                        value=printListToLine(self.ersatzbank),
                         inline=False)
         embed.add_field(name="Abgemeldet",
-                        value=self.printListToLine(self.abmeldungen),
+                        value=printListToLine(self.abmeldungen),
                         inline=False)
         embed.set_footer(text=self.footerText())
 
@@ -319,4 +343,12 @@ def timeToStr(zeit):
     except Exception as e:
         print('Error >> ', str(e))
         str = "Dienstag: 12:32"
+    return str
+
+
+def printListToLine(liste):
+    if len(liste) > 0:
+        str = (', '.join(liste))
+    else:
+        str = "Niemand"
     return str
