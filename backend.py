@@ -60,12 +60,6 @@ colors = {
 raidEventDic = {}
 
 
-def getTime():
-    timeutc = datetime.now()
-    local_time = timezone.localize(timeutc)
-    return local_time
-
-
 class EmbedEvent():
     def detailFormat(self):
         # Function returns the format of signups. 2: roles, 0: classes
@@ -90,7 +84,7 @@ class EmbedEvent():
         return int(time.time()) < self.deadline_ts
 
     def footerText(self) -> str:
-        timeNow = getTime()
+        timeNow = datetime.now().astimezone(timezone)
 
         text = ""
         strUpdate = "Letztes Update: {}".format(
