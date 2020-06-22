@@ -2,12 +2,17 @@ import aiohttp
 import json
 import time
 from datetime import datetime
+import pytz
 import discord
 import config as cf
+
+# Set Timezone
+timezone = pytz.timezone("Europe/Berlin")
 
 # RaidEvent Liste initialisieren
 raidEvents = []
 
+# Set Server Details
 protocol = "https"
 server = "cddt-wow.de"
 
@@ -55,6 +60,12 @@ colors = {
 raidEventDic = {}
 
 
+def getTime():
+    timeutc = datetime.now()
+    local_time = timezone.localize(timeutc)
+    return local_time
+
+
 class EmbedEvent():
     def detailFormat(self):
         # Function returns the format of signups. 2: roles, 0: classes
@@ -79,7 +90,8 @@ class EmbedEvent():
         return int(time.time()) < self.deadline_ts
 
     def footerText(self) -> str:
-        timeNow = datetime.now()
+        timeNow = getTime()
+
         text = ""
         strUpdate = "Letztes Update: {}".format(
             timeNow.strftime("%d.%m. um %H:%M")
