@@ -159,7 +159,7 @@ class EmbedEvent():
                               url=(
                                   "{}/index.php/Calendar/Calendarevent/{}.html"
                                   .format(base_url, self.id)
-                                  ),
+                              ),
                               description=timeToStr(self.raid_date),
                               color=(
                                   colors['green'] if self.signupPossible()
@@ -169,14 +169,9 @@ class EmbedEvent():
         if len(self.note) > 5:
             embed.add_field(
                 name="ANMERKUNG",
-                value=self.note,
+                value=(f"{self.note}"),
                 inline=False
             )
-            if 'sahne-team' in self.note.lower():
-                embed.set_author(
-                    name="Loot: SAHNE",
-                    url="https://www.sahne-team.de"
-                    )
 
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(
             self.raid_signups, self.raid_maxcount), inline=False)
