@@ -27,7 +27,8 @@ functions = {
     "details": "calevents_details&eventid=",
     "signup": "raid_signup&atype=user",
     "comment": "add_comment&atype=api",
-    "chars": "user_chars"
+    "chars": "user_chars",
+    "me": "me"
 }
 
 # Rollen IDs
