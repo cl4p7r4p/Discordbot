@@ -32,6 +32,11 @@ NUM_RAIDS = 3
 
 # self.user_chars: dict: {userid:['char1', 'char2', ...]}
 
+bot_action = discord.Activity(
+    name="!cddt help",
+    type=discord.ActivityType.listening
+)
+
 
 class Unauthorized(Exception):
     pass
@@ -48,6 +53,7 @@ class Guffelbot(discord.Client):
 
     def __init__(self, *, loop=None, **options):
         super().__init__(loop=loop, **options)
+
         # List of current Raid IDs
         self.curEvents = []
         # to retrieve raid id by message id {messageID:raidID}
@@ -73,6 +79,7 @@ class Guffelbot(discord.Client):
         print('Logged on as', self.user)
         try:
             await backend.preperation()
+            await self.change_presence(activity=bot_action)
             print("All set. Let's go!")
         except Exception as e:
             print('Error >> ', str(e))
