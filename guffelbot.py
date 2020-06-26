@@ -548,7 +548,7 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                                 user,
                                 msg.channel,
                                 to=15.0) - 1
-                            if choice in len(char_options):
+                            if choice < len(char_options):
                                 charidx = choice
                             else:
                                 charidx = 0
