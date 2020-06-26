@@ -156,13 +156,23 @@ class EmbedEvent():
     def createEmbed(self):
         self.getRaidMember()
         embed = discord.Embed(title=self.raid_title,
-                              url=base_url,
+                              url=(
+                                  "{}/index.php/Calendar/Calendarevent/{}.html"
+                                  .format(base_url, self.id)
+                              ),
                               description=timeToStr(self.raid_date),
                               color=(
                                   colors['green'] if self.signupPossible()
                                   else colors['red'])
                               )
         embed.set_thumbnail(url=self.iconURL)
+        if len(self.note) > 5:
+            embed.add_field(
+                name="ANMERKUNG",
+                value=(f"{self.note}"),
+                inline=False
+            )
+
         embed.add_field(name="Anmeldungen", value="{} von {} Spielern".format(
             self.raid_signups, self.raid_maxcount), inline=False)
         if self.format == 2:
@@ -209,6 +219,7 @@ class EmbedEvent():
         self.iconURL = RaidObj.iconURL
         self.raid_title = self.data['title']
         self.raid_date = self.data['start']
+        self.note = self.data['note']
         self.deadline = self.data['deadline']
         self.deadline_ts = self.data['deadline_timestamp']
         self.raid_signups = self.data['raidstatus']['status0']['count'] + \
