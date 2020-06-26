@@ -275,6 +275,27 @@ async def raidSignup(token, raidid, memberid, status, note):
     return post
 
 
+async def postComment(token, raidid, comment):
+    """
+    <request>
+        comment (string)
+        page (string)
+        attachid (string)
+        reply_to (integer; optional)
+    </request>
+    """
+
+    payload = {
+        "comment": comment,
+        "page": "articles",
+        "attachid": "12_" + str(raidid)
+    }
+    payload = json.dumps(payload)
+    print("trying to post comment")
+    post = await postData(token, "comment", payload)
+    return post
+
+
 async def fetch(session, url):
     async with session.get(url) as response:
         return await response.text()
@@ -298,10 +319,10 @@ async def getData(token: str, fun: str, eventid=0, manual=False) -> dict:
 async def postData(token: str, fun: str, payload):
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(base_url + '/api.php?format=json&atoken='
+            eqdkp_url = (base_url + '/api.php?format=json&atoken='
                                     + token
-                                    + '&function=' + functions[fun],
-                                    data=payload) as resp:
+                                    + '&function=' + functions[fun])
+            async with session.post(eqdkp_url, data=payload) as resp:
                 status = await resp.text()
         await session.close()
         return json.loads(status)

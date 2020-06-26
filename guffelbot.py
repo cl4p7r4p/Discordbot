@@ -197,6 +197,7 @@ Versuch es bitte gleich nochmal.
                 self.eventDic[msg.id] = raidid
                 if dead_ts > int(time.time()):
                     await self.addStatusReactions(msg)
+                    await msg.add_reaction("💬")
                     await msg.add_reaction("🔁")
             self.cdTime = int(time.time())
         self.curEvents = nextEvents
@@ -211,8 +212,8 @@ Versuch es bitte gleich nochmal.
         return
 
     async def clearReactions(self, msg):
-        for reaction in msg.reactions:
-            await reaction.remove(msg.author)
+        for emoji in reactions:
+            await msg.clear_reaction(emoji)
         return
 
     async def on_reaction_add(self, reaction, user):
@@ -228,6 +229,11 @@ Versuch es bitte gleich nochmal.
                 and (int(time.time()) - self.cdTime) > self.refreshCooldown:
             self.cdTime = int(time.time())
             await self.postRaids(reaction.message)
+        if reaction.emoji == "💬":
+            await self.raidComment(
+                user=user,
+                raidid=self.eventDic[reaction.message.id]
+            )
         elif reaction.emoji in reactions:
             try:
                 print("trying to signup {}".format(user.display_name))
@@ -281,6 +287,7 @@ Dein aktueller Status ist: {}
                     event_msg = await channel.send(embed=raid_embed)
                     self.eventDic[event_msg.id] = eventid
                     await self.addStatusReactions(event_msg)
+                    await event_msg.add_reaction("💬")
                     if eventid not in backend.raidEventDic:
                         await backend.makeRaidEvents([eventid])
             elif int(r['status']) == 0:
@@ -288,6 +295,7 @@ Dein aktueller Status ist: {}
                     title='Das ging schief :/',
                     description="Fehler: {}".format(str(r['error']))
                 ))
+
         except Exception as inst:
             print(type(inst))    # the exception instance
             print(inst.args)     # arguments stored in .args
@@ -496,13 +504,13 @@ indem du auf eine Reaktion unter dem Raidevent klickst.
                 )
                 return 0
 
-    async def note_helper(self, author, channel):
+    async def note_helper(self, author, channel, to=60.0):
         def check(message):
             return message.author == author and message.channel == channel
 
         await channel.send("Was willst du mitteilen?")
         try:
-            msg = await self.wait_for('message', check=check, timeout=60.0)
+            msg = await self.wait_for('message', check=check, timeout=to)
         except asyncio.TimeoutError:
             await channel.send("Keine Antwort erhalten")
             return ""
@@ -836,6 +844,36 @@ Bitte teile mir kurz mit, ob ich beim kommenden Raid mit dir rechnen kann.
             return 0, ""
         else:
             return -1, ""
+
+    async def raidComment(self, user, raidid):
+        """
+        Provides the functionality for the user to post a comment at raidevent
+        """
+        msg = await user.send(">> Kommentar zum Raid {raidtitle}".format(
+            raidtitle=backend.raidEventDic[raidid]["title"]
+        ))
+        comment = await self.note_helper(user, msg.channel, to=90.0)
+        if len(comment) > 5:
+            try:
+                response = await backend.postComment(
+                    self.registered_users[user.id]['token'],
+                    raidid,
+                    comment)
+                if response['status'] != 1:
+                    raise Exception(response)
+                else:
+                    await msg.channel.send(
+                        embed=discord.Embed(
+                            title="Kommentar erfolgreich abgeschickt",
+                            description=comment
+                        )
+                    )
+            except Exception as e:
+                await user.send("Das hat leider nicht geklappt")
+                print(f"Error >> {str(e)}")
+        else:
+            await user.send("Vorgang abgebrochen")
+            return
 
 
 client = Guffelbot()
