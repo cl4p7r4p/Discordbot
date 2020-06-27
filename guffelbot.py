@@ -878,4 +878,4 @@ Bitte teile mir kurz mit, ob ich beim kommenden Raid mit dir rechnen kann.
 
 client = Guffelbot()
 
-client.run(cf.guffeltoken1)  # 1: test #2: live
+client.run(cf.BOTTOKEN)  # 1: test #2: live
