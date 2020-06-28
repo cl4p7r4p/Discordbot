@@ -19,8 +19,8 @@ See https://eqdkp-plus.eu/ for more Information.
 - You need a "config.py" File with your EQDKP API Mastertoken (read-only) and your Bottoken like this:
 config.py:
 ```
-BOTTOKEN = NASDJJsdas8128
-mastertoken = ashd1231291aeeeff
+BOTTOKEN = "NASDJ...Jsdas8128"
+mastertoken = "ashd1231....291aeeeff"
 ```
 
 - change server adress in backend.py
